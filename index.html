@@ -30,7 +30,6 @@
     overflow: hidden;
   }
 
-  /* Decorative HUD background */
   .backdrop {
     position: fixed;
     inset: 0;
@@ -59,13 +58,13 @@
     flex-direction: column;
   }
 
-  /* Top bar */
   .topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 14px 22px;
     flex: 0 0 auto;
+    gap: 10px;
   }
   .brand {
     display: flex;
@@ -76,13 +75,18 @@
     font-size: 20px;
     color: var(--cyan);
     text-shadow: 0 0 18px var(--glow);
+    min-width: 0;
   }
   .brand small {
     letter-spacing: 0.3em;
     font-size: 10px;
     color: var(--cyan-dim);
     text-shadow: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  .topbar-actions { display: flex; gap: 10px; flex: 0 0 auto; }
   .iconbtn {
     background: rgba(6, 26, 36, 0.6);
     border: 1px solid var(--line);
@@ -95,8 +99,9 @@
     transition: box-shadow .2s, border-color .2s, transform .15s;
   }
   .iconbtn:hover { box-shadow: 0 0 16px var(--glow); border-color: var(--cyan); transform: translateY(-1px); }
+  .iconbtn.text { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; }
+  .iconbtn.on { border-color: var(--cyan); box-shadow: 0 0 16px var(--glow); color: #eafaff; background: rgba(12,46,60,0.8); }
 
-  /* Main layout */
   .main {
     flex: 1 1 auto;
     display: grid;
@@ -126,7 +131,6 @@
     opacity: 0.85;
   }
 
-  /* Center column: reactor + status */
   .center {
     display: flex;
     flex-direction: column;
@@ -151,11 +155,11 @@
     color: var(--cyan);
     text-shadow: 0 0 12px var(--glow);
     min-height: 18px;
+    padding: 0 10px;
   }
   .status.thinking { color: var(--warn); text-shadow: 0 0 12px rgba(255,180,84,.5); }
   .status.error { color: #ff6b6b; text-shadow: none; }
 
-  /* Transcript */
   .transcript {
     overflow-y: auto;
     display: flex;
@@ -191,27 +195,41 @@
   }
   .msg.system .body { color: var(--warn); font-size: 13px; opacity: 0.9; }
 
-  /* Goal panel */
-  .goal-title {
-    font-size: 15px;
-    color: #eafaff;
-    border-left: 3px solid var(--cyan);
-    padding: 6px 0 6px 10px;
-    margin-bottom: 12px;
-    min-height: 20px;
-  }
+  /* Goals */
+  .goals { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
   .goal-empty { color: var(--cyan-dim); font-size: 13px; font-style: italic; }
-  .steps { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+  .goal-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: rgba(5, 18, 26, 0.4);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .goal-card.active {
+    border-color: var(--cyan-deep);
+    box-shadow: inset 0 0 14px rgba(91,232,255,0.08), 0 0 10px rgba(91,232,255,0.12);
+  }
+  .goal-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .goal-head .name { flex: 1 1 auto; font-size: 14px; color: #dff4fb; word-break: break-word; }
+  .goal-card.active .goal-head .name { color: #fff; text-shadow: 0 0 10px var(--glow); }
+  .goal-del {
+    background: none; border: none; color: var(--cyan-dim);
+    cursor: pointer; font-size: 18px; line-height: 1;
+    padding: 0 4px; border-radius: 6px; flex: 0 0 auto;
+  }
+  .goal-del:hover { color: #ff6b6b; }
+  .steps { list-style: none; margin: 8px 0 2px; padding: 0; }
   .steps li {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 8px 6px;
+    padding: 7px 4px;
     border-bottom: 1px dashed var(--line);
     cursor: pointer;
     font-size: 13.5px;
     line-height: 1.4;
   }
+  .steps li:last-child { border-bottom: none; }
   .steps li:hover { background: rgba(91,232,255,0.05); }
   .steps .box {
     flex: 0 0 auto;
@@ -226,7 +244,6 @@
   .steps li.done .box { background: rgba(109,255,176,0.15); border-color: var(--ok); }
   .steps li.done .txt { text-decoration: line-through; opacity: 0.55; }
 
-  /* Bottom controls */
   .controls {
     flex: 0 0 auto;
     display: flex;
@@ -280,6 +297,7 @@
     color: var(--text);
     font-size: 15px;
     padding: 8px 0;
+    min-width: 0;
   }
   #textInput::placeholder { color: var(--cyan-dim); }
   .send {
@@ -292,10 +310,10 @@
     cursor: pointer;
     letter-spacing: 0.05em;
     transition: box-shadow .2s, background .2s;
+    flex: 0 0 auto;
   }
   .send:hover { box-shadow: 0 0 16px var(--glow); background: var(--cyan); }
 
-  /* Settings overlay */
   .overlay {
     position: fixed; inset: 0;
     background: rgba(2, 6, 12, 0.78);
@@ -347,7 +365,6 @@
   .btn:hover { border-color: var(--cyan); box-shadow: 0 0 12px var(--glow); }
   .btn.primary { background: var(--cyan-deep); color: #021018; font-weight: 700; border-color: var(--cyan-deep); }
 
-  /* Responsive: stack columns on narrow screens */
   @media (max-width: 900px) {
     .main {
       grid-template-columns: 1fr;
@@ -357,6 +374,7 @@
     .center { order: -1; }
     .reactor-wrap { width: min(40vh, 70%); }
     .panel { max-height: 34vh; }
+    .brand small { display: none; }
   }
 </style>
 </head>
@@ -366,19 +384,20 @@
 
   <div class="app">
     <header class="topbar">
-      <div class="brand">J.A.R.V.I.S. <small>Just A Rather Very Intelligent System</small></div>
-      <button class="iconbtn" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen">⚙</button>
+      <div class="brand">J.A.R.V.I.S. <small id="brandSub">Just A Rather Very Intelligent System</small></div>
+      <div class="topbar-actions">
+        <button class="iconbtn text" id="langBtn" title="Sprache wechseln / Switch language">DE</button>
+        <button class="iconbtn" id="handsFreeBtn" title="Freisprechen">∞</button>
+        <button class="iconbtn" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen">⚙</button>
+      </div>
     </header>
 
     <div class="main">
-      <!-- Goal panel -->
       <section class="panel" id="goalPanel">
-        <h2>Aktuelles Ziel</h2>
-        <div class="goal-title" id="goalTitle"><span class="goal-empty">Noch kein Ziel gesetzt. Sag mir dein Ziel …</span></div>
-        <ul class="steps" id="steps"></ul>
+        <h2 id="goalHeading">Aktuelle Ziele</h2>
+        <div class="goals" id="goals"></div>
       </section>
 
-      <!-- Center: reactor -->
       <section class="center">
         <div class="reactor-wrap">
           <canvas id="reactor"></canvas>
@@ -386,9 +405,8 @@
         <div class="status" id="status">Systeme bereit</div>
       </section>
 
-      <!-- Transcript -->
       <section class="panel">
-        <h2>Dialog</h2>
+        <h2 id="dialogHeading">Dialog</h2>
         <div class="transcript" id="transcript"></div>
       </section>
     </div>
@@ -402,16 +420,13 @@
     </div>
   </div>
 
-  <!-- Settings -->
   <div class="overlay" id="overlay">
     <div class="dialog">
-      <h2>EINSTELLUNGEN</h2>
-      <p>JARVIS nutzt die Anthropic Claude API für echte Antworten. Trage dazu deinen persönlichen API-Key ein. Der Key wird nur lokal in deinem Browser gespeichert und mit keinem Server außer Anthropic geteilt.</p>
-      <label for="keyInput">Anthropic API-Key</label>
+      <h2 id="setTitle">EINSTELLUNGEN</h2>
+      <p id="setIntro">JARVIS nutzt die Anthropic Claude API für echte Antworten. Trage dazu deinen persönlichen API-Key ein. Der Key wird nur lokal in deinem Browser gespeichert und mit keinem Server außer Anthropic geteilt.</p>
+      <label id="keyLabel" for="keyInput">Anthropic API-Key</label>
       <input id="keyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
-      <div class="note">
-        Sicherheitshinweis: Dieses Interface ist für den <b>persönlichen, lokalen</b> Gebrauch gedacht. Der Key liegt im Browser (localStorage). Teile diese Datei nicht mit eingetragenem Key und stelle sie nicht öffentlich online.
-      </div>
+      <div class="note" id="setNote">Sicherheitshinweis: Dieses Interface ist für den persönlichen, lokalen Gebrauch gedacht. Der Key liegt im Browser (localStorage). Teile diese Datei nicht mit eingetragenem Key und stelle sie nicht öffentlich online.</div>
       <div class="row">
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
@@ -422,31 +437,134 @@
 <script>
 "use strict";
 
-/* ---------- Konfiguration ---------- */
+/* ================================================================
+   Konfiguration & Übersetzungen
+   ================================================================ */
 const MODEL = "claude-opus-4-8";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const LS_KEY = "jarvis_api_key";
-const LS_GOAL = "jarvis_goal";
+const LS_GOALS = "jarvis_goals";
+const LS_GOAL_OLD = "jarvis_goal";
+const LS_LANG = "jarvis_lang";
+const LS_HANDSFREE = "jarvis_handsfree";
 
-const SYSTEM_PROMPT = [
-  "Du bist JARVIS, ein hochentwickelter persoenlicher KI-Assistent im Stil von Iron Man.",
-  "Du sprichst Deutsch, ruhig, hoeflich, souveraen und leicht elegant im Ton.",
-  "Deine Antworten werden dem Nutzer vorgelesen. Deshalb:",
-  "- Antworte in klaren, gesprochenen Saetzen. Keine Markdown-Zeichen, keine Sternchen, keine Emojis.",
-  "- Fasse dich in der Regel kurz und natuerlich (1 bis 4 Saetze), ausser der Nutzer bittet ausdruecklich um mehr.",
-  "",
-  "Wenn der Nutzer dir ein Ziel nennt (zum Beispiel Geld verdienen, etwas lernen, ein Projekt umsetzen):",
-  "- Bestaetige das Ziel zuerst in einem kurzen Satz.",
-  "- Nenne dann einen konkreten Plan als nummerierte Liste. Schreibe jeden Schritt in eine eigene Zeile im Format '1. …', '2. …', '3. …', jeweils eine umsetzbare Handlung.",
-  "- Sei realistisch und ehrlich: Du bist eine Sprachoberflaeche und kannst Aufgaben nicht selbst ausfuehren oder wirklich Geld verdienen. Du hilfst mit Planung, Ideen und Anleitung."
-].join("\n");
+const SYSTEM_PROMPTS = {
+  de: [
+    "Du bist JARVIS, ein hochentwickelter persoenlicher KI-Assistent im Stil von Iron Man.",
+    "Du sprichst Deutsch, ruhig, hoeflich, souveraen und leicht elegant im Ton.",
+    "Deine Antworten werden dem Nutzer vorgelesen. Deshalb:",
+    "- Antworte in klaren, gesprochenen Saetzen. Keine Markdown-Zeichen, keine Sternchen, keine Emojis.",
+    "- Fasse dich in der Regel kurz und natuerlich (1 bis 4 Saetze), ausser der Nutzer bittet ausdruecklich um mehr.",
+    "",
+    "Wenn der Nutzer dir ein Ziel nennt (zum Beispiel Geld verdienen, etwas lernen, ein Projekt umsetzen):",
+    "- Bestaetige das Ziel zuerst in einem kurzen Satz.",
+    "- Nenne dann einen konkreten Plan als nummerierte Liste. Schreibe jeden Schritt in eine eigene Zeile im Format '1. …', '2. …', '3. …', jeweils eine umsetzbare Handlung.",
+    "- Sei realistisch und ehrlich: Du bist eine Sprachoberflaeche und kannst Aufgaben nicht selbst ausfuehren oder wirklich Geld verdienen. Du hilfst mit Planung, Ideen und Anleitung."
+  ].join("\n"),
+  en: [
+    "You are JARVIS, an advanced personal AI assistant in the style of Iron Man.",
+    "You speak English, calm, polite, composed and slightly elegant in tone.",
+    "Your answers are read aloud to the user. Therefore:",
+    "- Answer in clear, spoken sentences. No markdown characters, no asterisks, no emojis.",
+    "- Keep it short and natural (usually 1 to 4 sentences) unless the user explicitly asks for more.",
+    "",
+    "When the user gives you a goal (for example earning money, learning something, completing a project):",
+    "- Confirm the goal first in one short sentence.",
+    "- Then give a concrete plan as a numbered list. Write each step on its own line as '1. …', '2. …', '3. …', each an actionable step.",
+    "- Be realistic and honest: you are a voice interface and cannot perform tasks yourself or actually earn money. You help with planning, ideas and guidance."
+  ].join("\n")
+};
 
-/* ---------- Zustand ---------- */
+const I18N = {
+  de: {
+    htmlLang: "de",
+    subtitle: "Just A Rather Very Intelligent System",
+    goalHeading: "Aktuelle Ziele",
+    goalEmpty: "Noch kein Ziel gesetzt. Sag mir dein Ziel …",
+    deleteGoal: "Ziel entfernen",
+    dialogHeading: "Dialog",
+    ready: "Systeme bereit",
+    listening: "Ich höre …",
+    thinking: "Verarbeite …",
+    speaking: "Spreche …",
+    errorLabel: "Fehler",
+    you: "Du", jarvis: "JARVIS", system: "System",
+    placeholder: "Sprich mit JARVIS oder tippe hier …",
+    send: "Senden",
+    micTitle: "Sprechen (Push-to-talk)",
+    micUnsupported: "Spracherkennung in diesem Browser nicht verfügbar – bitte tippen",
+    handsFreeOn: "Freisprechen aktiv – zum Beenden klicken",
+    handsFreeOff: "Freisprechen (Hände-frei-Modus)",
+    settingsTitle: "EINSTELLUNGEN",
+    settingsIntro: "JARVIS nutzt die Anthropic Claude API für echte Antworten. Trage dazu deinen persönlichen API-Key ein. Der Key wird nur lokal in deinem Browser gespeichert und mit keinem Server außer Anthropic geteilt.",
+    keyLabel: "Anthropic API-Key",
+    securityNote: "Sicherheitshinweis: Dieses Interface ist für den persönlichen, lokalen Gebrauch gedacht. Der Key liegt im Browser (localStorage). Teile diese Datei nicht mit eingetragenem Key und stelle sie nicht öffentlich online.",
+    clearKey: "Key löschen",
+    saveKey: "Speichern",
+    keySaved: "API-Key gespeichert. JARVIS ist einsatzbereit.",
+    noKey: "Kein API-Key hinterlegt. Öffne die Einstellungen (Zahnrad oben rechts) und trage deinen Anthropic API-Key ein.",
+    welcomeNoKey: "Willkommen. Ich bin JARVIS. Bitte trage zuerst deinen Anthropic API-Key in den Einstellungen ein (Zahnrad oben rechts), dann können wir sprechen.",
+    welcome: "Systeme online. Ich bin bereit, Sir. Nenn mir dein Ziel oder stell mir eine Frage.",
+    micDenied: "Mikrofon-Zugriff verweigert. Du kannst stattdessen tippen.",
+    err401: "API-Key ungültig oder fehlt die Berechtigung. Bitte in den Einstellungen prüfen.",
+    err429: "Zu viele Anfragen oder Kontingent erschöpft. Bitte kurz warten und erneut versuchen.",
+    err500: "Der Anthropic-Dienst ist momentan überlastet. Bitte später erneut versuchen.",
+    errGeneric: (s) => "Fehler bei der Anfrage (" + s + ").",
+    errDetails: " Details: ",
+    errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")"
+  },
+  en: {
+    htmlLang: "en",
+    subtitle: "Just A Rather Very Intelligent System",
+    goalHeading: "Current Goals",
+    goalEmpty: "No goal set yet. Tell me your goal …",
+    deleteGoal: "Remove goal",
+    dialogHeading: "Dialogue",
+    ready: "Systems ready",
+    listening: "Listening …",
+    thinking: "Processing …",
+    speaking: "Speaking …",
+    errorLabel: "Error",
+    you: "You", jarvis: "JARVIS", system: "System",
+    placeholder: "Talk to JARVIS or type here …",
+    send: "Send",
+    micTitle: "Speak (push-to-talk)",
+    micUnsupported: "Speech recognition is not available in this browser – please type",
+    handsFreeOn: "Hands-free active – click to stop",
+    handsFreeOff: "Hands-free mode",
+    settingsTitle: "SETTINGS",
+    settingsIntro: "JARVIS uses the Anthropic Claude API for real answers. Enter your personal API key below. The key is stored only locally in your browser and shared with no server other than Anthropic.",
+    keyLabel: "Anthropic API key",
+    securityNote: "Security note: This interface is meant for personal, local use. The key lives in your browser (localStorage). Do not share this file with the key entered, and do not host it publicly.",
+    clearKey: "Clear key",
+    saveKey: "Save",
+    keySaved: "API key saved. JARVIS is ready.",
+    noKey: "No API key set. Open the settings (gear, top right) and enter your Anthropic API key.",
+    welcomeNoKey: "Welcome. I am JARVIS. Please enter your Anthropic API key in the settings first (gear, top right), then we can talk.",
+    welcome: "Systems online. I am ready, Sir. Tell me your goal or ask me a question.",
+    micDenied: "Microphone access denied. You can type instead.",
+    err401: "API key invalid or missing permission. Please check the settings.",
+    err429: "Too many requests or quota exhausted. Please wait a moment and try again.",
+    err500: "The Anthropic service is currently overloaded. Please try again later.",
+    errGeneric: (s) => "Request failed (" + s + ").",
+    errDetails: " Details: ",
+    errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")"
+  }
+};
+
+/* ================================================================
+   Zustand
+   ================================================================ */
+let lang = localStorage.getItem(LS_LANG) || "de";
+if (!I18N[lang]) lang = "de";
 let state = "idle"; // idle | listening | thinking | speaking
-let micLevel = 0;   // 0..1, aus Web Audio waehrend des Zuhoerens
-const conversation = []; // { role, content }
+let micLevel = 0;
+const conversation = [];
+const t = (key) => I18N[lang][key];
 
-/* ---------- DOM ---------- */
+/* ================================================================
+   DOM
+   ================================================================ */
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 const transcriptEl = $("transcript");
@@ -455,10 +573,13 @@ const textInput = $("textInput");
 const sendBtn = $("sendBtn");
 const overlay = $("overlay");
 const keyInput = $("keyInput");
-const goalTitleEl = $("goalTitle");
-const stepsEl = $("steps");
+const goalsEl = $("goals");
+const langBtn = $("langBtn");
+const handsFreeBtn = $("handsFreeBtn");
 
-/* ---------- API-Key ---------- */
+/* ================================================================
+   API-Key
+   ================================================================ */
 const getKey = () => localStorage.getItem(LS_KEY) || "";
 function saveKey(v) { localStorage.setItem(LS_KEY, v.trim()); }
 
@@ -483,45 +604,34 @@ function drawReactor(ts) {
   if (!w || !h) { requestAnimationFrame(drawReactor); return; }
   const cx = w / 2, cy = h / 2;
   const R = Math.min(w, h) * 0.44;
-  const t = ts / 1000;
+  const time = ts / 1000;
 
   ctx.clearRect(0, 0, w, h);
 
-  // Zustandsabhaengige Parameter
   let spin = 0.15, pulseSpeed = 1.4, pulseAmp = 0.05, hue = "cyan";
   if (state === "listening") { spin = 0.25; pulseSpeed = 3.2; pulseAmp = 0.05 + micLevel * 0.5; }
   else if (state === "thinking") { spin = 0.9; pulseSpeed = 6; pulseAmp = 0.12; hue = "warn"; }
   else if (state === "speaking") { spin = 0.35; pulseSpeed = 5; pulseAmp = 0.14; }
 
   angle += spin * 0.016;
-  const pulse = 1 + Math.sin(t * pulseSpeed) * pulseAmp;
+  const pulse = 1 + Math.sin(time * pulseSpeed) * pulseAmp;
 
   const CY = "91, 232, 255";
   const WA = "255, 180, 84";
   const col = hue === "warn" ? WA : CY;
 
-  // Aussenring
-  ring(cx, cy, R, 2 * dpr, `rgba(${col},0.35)`);
+  ring(cx, cy, R, 2 * dpr, "rgba(" + col + ",0.35)");
+  segmentRing(cx, cy, R * 0.9, 18, angle, "rgba(" + col + ",0.8)", 3 * dpr);
+  tickRing(cx, cy, R * 0.72, 60, -angle * 0.6, "rgba(" + col + ",0.5)");
+  polygon(cx, cy, R * 0.5 * pulse, 6, angle * 1.5, "rgba(" + col + ",0.6)", 2 * dpr);
+  polygon(cx, cy, R * 0.5 * pulse, 6, -angle * 1.5 + 0.5, "rgba(" + col + ",0.35)", 2 * dpr);
+  ring(cx, cy, R * 0.36 * pulse, 3 * dpr, "rgba(" + col + ",0.9)");
 
-  // Segmentierter Ring (rotierend)
-  segmentRing(cx, cy, R * 0.9, 18, angle, `rgba(${col},0.8)`, 3 * dpr);
-
-  // Tick-Ring
-  tickRing(cx, cy, R * 0.72, 60, -angle * 0.6, `rgba(${col},0.5)`);
-
-  // Rotierendes Dreieck / Hexagon (Arc-Reactor-Kern-Anmutung)
-  polygon(cx, cy, R * 0.5 * pulse, 6, angle * 1.5, `rgba(${col},0.6)`, 2 * dpr);
-  polygon(cx, cy, R * 0.5 * pulse, 6, -angle * 1.5 + 0.5, `rgba(${col},0.35)`, 2 * dpr);
-
-  // Innenring
-  ring(cx, cy, R * 0.36 * pulse, 3 * dpr, `rgba(${col},0.9)`);
-
-  // Gluehender Kern
   const coreR = R * 0.26 * pulse;
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-  g.addColorStop(0, `rgba(255,255,255,0.95)`);
-  g.addColorStop(0.35, `rgba(${col},0.9)`);
-  g.addColorStop(1, `rgba(${col},0)`);
+  g.addColorStop(0, "rgba(255,255,255,0.95)");
+  g.addColorStop(0.35, "rgba(" + col + ",0.9)");
+  g.addColorStop(1, "rgba(" + col + ",0)");
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
@@ -543,10 +653,8 @@ function segmentRing(cx, cy, r, segments, rot, style, lw) {
   const gap = 0.12;
   const step = (Math.PI * 2) / segments;
   for (let i = 0; i < segments; i++) {
-    const a0 = rot + i * step + gap;
-    const a1 = rot + (i + 1) * step - gap;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, a0, a1);
+    ctx.arc(cx, cy, r, rot + i * step + gap, rot + (i + 1) * step - gap);
     ctx.stroke();
   }
 }
@@ -581,7 +689,7 @@ function polygon(cx, cy, r, sides, rot, style, lw) {
 function setState(s, label) {
   state = s;
   statusEl.className = "status" + (s === "thinking" ? " thinking" : "");
-  const labels = { idle: "Systeme bereit", listening: "Ich höre …", thinking: "Verarbeite …", speaking: "Spreche …" };
+  const labels = { idle: t("ready"), listening: t("listening"), thinking: t("thinking"), speaking: t("speaking") };
   statusEl.textContent = label || labels[s] || "";
 }
 
@@ -591,7 +699,7 @@ function setState(s, label) {
 function addMessage(who, text) {
   const div = document.createElement("div");
   div.className = "msg " + who;
-  const label = who === "user" ? "Du" : who === "jarvis" ? "JARVIS" : "System";
+  const label = who === "user" ? t("you") : who === "jarvis" ? t("jarvis") : t("system");
   div.innerHTML = '<span class="who"></span><span class="body"></span>';
   div.querySelector(".who").textContent = label;
   div.querySelector(".body").textContent = text;
@@ -601,92 +709,146 @@ function addMessage(who, text) {
 }
 
 /* ================================================================
-   Sprachausgabe (deutsche Stimme)
+   Sprachausgabe
    ================================================================ */
-let germanVoice = null;
-function loadVoices() {
+let ttsVoice = null;
+function pickVoice() {
   if (!("speechSynthesis" in window)) return;
   const voices = speechSynthesis.getVoices();
-  germanVoice =
-    voices.find(v => /de[-_]DE/i.test(v.lang)) ||
-    voices.find(v => v.lang && v.lang.toLowerCase().startsWith("de")) ||
+  const pref = lang === "de" ? "de" : "en";
+  ttsVoice =
+    voices.find(v => new RegExp("^" + pref + "[-_]", "i").test(v.lang || "")) ||
+    voices.find(v => (v.lang || "").toLowerCase().startsWith(pref)) ||
     null;
 }
 if ("speechSynthesis" in window) {
-  loadVoices();
-  speechSynthesis.onvoiceschanged = loadVoices;
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
 }
 
 function speak(text) {
-  if (!("speechSynthesis" in window)) { setState("idle"); return; }
+  if (!("speechSynthesis" in window)) { setState("idle"); handsFreeContinue(); return; }
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "de-DE";
-  if (germanVoice) u.voice = germanVoice;
+  u.lang = lang === "de" ? "de-DE" : "en-US";
+  if (ttsVoice) u.voice = ttsVoice;
   u.rate = 1.0;
   u.pitch = 1.0;
   u.onstart = () => setState("speaking");
-  u.onend = () => setState("idle");
-  u.onerror = () => setState("idle");
+  u.onend = () => { setState("idle"); handsFreeContinue(); };
+  u.onerror = () => { setState("idle"); handsFreeContinue(); };
   speechSynthesis.speak(u);
 }
 
 /* ================================================================
-   Ziel-Panel
+   Ziele (mehrere, mit Checkliste)
    ================================================================ */
-let goal = null; // { title, steps: [{text, done}] }
+let goals = [];          // [{ id, title, steps: [{text, done}] }]
+let activeGoalId = null;
 
-function loadGoal() {
+function saveGoals() { localStorage.setItem(LS_GOALS, JSON.stringify({ goals, activeGoalId })); }
+
+function loadGoals() {
   try {
-    const raw = localStorage.getItem(LS_GOAL);
-    if (raw) { goal = JSON.parse(raw); renderGoal(); }
+    const raw = localStorage.getItem(LS_GOALS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      goals = Array.isArray(parsed.goals) ? parsed.goals : [];
+      activeGoalId = parsed.activeGoalId || (goals[0] && goals[0].id) || null;
+    } else {
+      const old = localStorage.getItem(LS_GOAL_OLD); // Migration Einzel-Ziel
+      if (old) {
+        const g = JSON.parse(old);
+        if (g && g.title) {
+          const ng = { id: "legacy", title: g.title, steps: g.steps || [] };
+          goals = [ng]; activeGoalId = "legacy"; saveGoals();
+        }
+      }
+    }
   } catch (e) { /* ignorieren */ }
+  renderGoals();
 }
-function saveGoal() {
-  if (goal) localStorage.setItem(LS_GOAL, JSON.stringify(goal));
-}
-function renderGoal() {
-  if (!goal || !goal.title) {
-    goalTitleEl.innerHTML = '<span class="goal-empty">Noch kein Ziel gesetzt. Sag mir dein Ziel …</span>';
-    stepsEl.innerHTML = "";
+
+function renderGoals() {
+  goalsEl.innerHTML = "";
+  if (!goals.length) {
+    const d = document.createElement("div");
+    d.className = "goal-empty";
+    d.textContent = t("goalEmpty");
+    goalsEl.appendChild(d);
     return;
   }
-  goalTitleEl.textContent = goal.title;
-  stepsEl.innerHTML = "";
-  (goal.steps || []).forEach((step, i) => {
-    const li = document.createElement("li");
-    if (step.done) li.classList.add("done");
-    const box = document.createElement("span");
-    box.className = "box";
-    box.textContent = step.done ? "✓" : "";
-    const txt = document.createElement("span");
-    txt.className = "txt";
-    txt.textContent = step.text;
-    li.appendChild(box);
-    li.appendChild(txt);
-    li.addEventListener("click", () => {
-      goal.steps[i].done = !goal.steps[i].done;
-      saveGoal();
-      renderGoal();
+  goals.forEach(g => {
+    const card = document.createElement("div");
+    card.className = "goal-card" + (g.id === activeGoalId ? " active" : "");
+
+    const head = document.createElement("div");
+    head.className = "goal-head";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = g.title;
+    const del = document.createElement("button");
+    del.className = "goal-del";
+    del.textContent = "×";
+    del.title = t("deleteGoal");
+    head.appendChild(name);
+    head.appendChild(del);
+
+    head.addEventListener("click", (e) => {
+      if (e.target === del) return;
+      activeGoalId = g.id; saveGoals(); renderGoals();
     });
-    stepsEl.appendChild(li);
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      goals = goals.filter(x => x.id !== g.id);
+      if (activeGoalId === g.id) activeGoalId = (goals[0] && goals[0].id) || null;
+      saveGoals(); renderGoals();
+    });
+    card.appendChild(head);
+
+    if (g.id === activeGoalId && g.steps && g.steps.length) {
+      const ul = document.createElement("ul");
+      ul.className = "steps";
+      g.steps.forEach((step) => {
+        const li = document.createElement("li");
+        if (step.done) li.classList.add("done");
+        const box = document.createElement("span");
+        box.className = "box";
+        box.textContent = step.done ? "✓" : "";
+        const txt = document.createElement("span");
+        txt.className = "txt";
+        txt.textContent = step.text;
+        li.appendChild(box);
+        li.appendChild(txt);
+        li.addEventListener("click", () => { step.done = !step.done; saveGoals(); renderGoals(); });
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+    }
+    goalsEl.appendChild(card);
   });
 }
 
-const GOAL_HINTS = /\b(ziel|verdien|verdiene|verdienen|euro|€|erreichen|schaffen|m[oö]chte|will ich|lernen|abnehmen|sparen|projekt|starten|aufbauen|erreiche)\b/i;
-
+const GOAL_HINTS = {
+  de: /\b(ziel|verdien\w*|euro|erreichen|schaffen|m[oö]chte|will\s+ich|lernen|abnehmen|sparen|projekt|starten|aufbauen)\b/i,
+  en: /\b(goal|earn\w*|money|dollars?|euros?|want\s+to|would\s+like|learn|save|build|start|project|achieve|lose\s+weight)\b/i
+};
 function looksLikeGoal(text) {
-  return GOAL_HINTS.test(text);
+  return GOAL_HINTS[lang].test(text) || /[€$]/.test(text);
 }
 function cleanGoalTitle(text) {
-  let t = text.trim();
-  // Fuehrende Anrede/Fuellwoerter entfernen
-  t = t.replace(/^(jarvis[,:\s]+)/i, "");
-  t = t.replace(/^(mein ziel ist[,:\s]*(dass|es,)?\s*)/i, "");
-  t = t.replace(/^(ich (m[oö]chte|will)[,:\s]*)/i, "");
-  t = t.trim();
-  if (t.length > 120) t = t.slice(0, 117) + "…";
-  return t.charAt(0).toUpperCase() + t.slice(1);
+  let s = text.trim();
+  s = s.replace(/^(jarvis[,:\s]+)/i, "");
+  if (lang === "de") {
+    s = s.replace(/^(mein ziel ist[,:\s]*(dass|es,)?\s*)/i, "");
+    s = s.replace(/^(ich (m[oö]chte|will)[,:\s]*)/i, "");
+  } else {
+    s = s.replace(/^(my goal is[,:\s]*(to|that)?\s*)/i, "");
+    s = s.replace(/^(i (want to|would like to|wanna|'d like to)[,:\s]*)/i, "");
+  }
+  s = s.trim();
+  if (s.length > 120) s = s.slice(0, 117) + "…";
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 function parseSteps(reply) {
   const steps = [];
@@ -696,18 +858,30 @@ function parseSteps(reply) {
   });
   return steps;
 }
+const normTitle = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 
 function maybeUpdateGoal(userText, reply) {
   const steps = parseSteps(reply);
   if (looksLikeGoal(userText)) {
-    goal = { title: cleanGoalTitle(userText), steps: steps };
-    saveGoal();
-    renderGoal();
-  } else if (goal && steps.length && (!goal.steps || !goal.steps.length)) {
-    // Ziel bestand bereits, aber ohne Schritte -> Schritte ergaenzen
-    goal.steps = steps;
-    saveGoal();
-    renderGoal();
+    const title = cleanGoalTitle(userText);
+    const active = goals.find(g => g.id === activeGoalId);
+    if (active) {
+      const a = normTitle(active.title), b = normTitle(title);
+      if (a && b && (a.includes(b) || b.includes(a))) {
+        if (steps.length) active.steps = steps; // gleiches Ziel verfeinert
+        saveGoals(); renderGoals();
+        return;
+      }
+    }
+    const g = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title, steps };
+    goals.push(g);
+    activeGoalId = g.id;
+    saveGoals(); renderGoals();
+  } else {
+    const active = goals.find(g => g.id === activeGoalId);
+    if (active && steps.length && (!active.steps || !active.steps.length)) {
+      active.steps = steps; saveGoals(); renderGoals();
+    }
   }
 }
 
@@ -716,8 +890,9 @@ function maybeUpdateGoal(userText, reply) {
    ================================================================ */
 async function askClaude(userText) {
   const key = getKey();
+  const L = I18N[lang];
   if (!key) {
-    addMessage("system", "Kein API-Key hinterlegt. Öffne die Einstellungen (Zahnrad oben rechts) und trage deinen Anthropic API-Key ein.");
+    addMessage("system", L.noKey);
     setState("idle");
     openSettings();
     return;
@@ -738,7 +913,7 @@ async function askClaude(userText) {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
+        system: SYSTEM_PROMPTS[lang],
         messages: conversation
       })
     });
@@ -747,15 +922,15 @@ async function askClaude(userText) {
       let detail = "";
       try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
       let msg;
-      if (res.status === 401) msg = "API-Key ungültig oder fehlt die Berechtigung. Bitte in den Einstellungen prüfen.";
-      else if (res.status === 429) msg = "Zu viele Anfragen oder Kontingent erschöpft. Bitte kurz warten und erneut versuchen.";
-      else if (res.status >= 500) msg = "Der Anthropic-Dienst ist momentan überlastet. Bitte später erneut versuchen.";
-      else msg = "Fehler bei der Anfrage (" + res.status + ").";
-      if (detail) msg += " Details: " + detail;
-      conversation.pop(); // fehlgeschlagenen User-Turn nicht behalten
+      if (res.status === 401) msg = L.err401;
+      else if (res.status === 429) msg = L.err429;
+      else if (res.status >= 500) msg = L.err500;
+      else msg = L.errGeneric(res.status);
+      if (detail) msg += L.errDetails + detail;
+      conversation.pop();
       addMessage("system", msg);
       statusEl.className = "status error";
-      statusEl.textContent = "Fehler";
+      statusEl.textContent = L.errorLabel;
       setTimeout(() => setState("idle"), 200);
       return;
     }
@@ -774,9 +949,9 @@ async function askClaude(userText) {
 
   } catch (err) {
     conversation.pop();
-    addMessage("system", "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + (err && err.message ? err.message : err) + ")");
+    addMessage("system", L.errNet(err && err.message ? err.message : err));
     statusEl.className = "status error";
-    statusEl.textContent = "Fehler";
+    statusEl.textContent = L.errorLabel;
     setTimeout(() => setState("idle"), 200);
   }
 }
@@ -785,32 +960,52 @@ async function askClaude(userText) {
    Eingabe senden
    ================================================================ */
 function submitText(text) {
-  const t = (text || "").trim();
-  if (!t) return;
-  addMessage("user", t);
+  const s = (text || "").trim();
+  if (!s) return;
+  addMessage("user", s);
   textInput.value = "";
-  askClaude(t);
+  askClaude(s);
 }
-
 sendBtn.addEventListener("click", () => submitText(textInput.value));
 textInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); submitText(textInput.value); }
 });
 
 /* ================================================================
-   Spracheingabe (Web Speech API, de-DE)
+   Spracheingabe (Web Speech API) + Freisprech-Modus
    ================================================================ */
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let listening = false;
+let gotFinal = false;
+let handsFree = localStorage.getItem(LS_HANDSFREE) === "1";
+
+function startListening() {
+  if (!recognition || listening) return;
+  if (!getKey()) return;
+  if (state === "speaking" && "speechSynthesis" in window) speechSynthesis.cancel();
+  try { recognition.start(); } catch (_) { /* bereits gestartet */ }
+}
+function handsFreeContinue() {
+  if (handsFree && getKey() && !listening) {
+    setTimeout(() => {
+      if (handsFree && state === "idle" && !listening && getKey()) startListening();
+    }, 500);
+  }
+}
+function updateHandsFreeBtn() {
+  handsFreeBtn.classList.toggle("on", handsFree);
+  handsFreeBtn.title = handsFree ? t("handsFreeOn") : t("handsFreeOff");
+}
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
-  recognition.lang = "de-DE";
+  recognition.lang = lang === "de" ? "de-DE" : "en-US";
   recognition.interimResults = true;
   recognition.continuous = false;
 
   recognition.onstart = () => {
+    gotFinal = false;
     listening = true;
     micBtn.classList.add("active");
     setState("listening");
@@ -825,36 +1020,55 @@ if (SpeechRecognition) {
     }
     if (interim) setState("listening", "„" + interim.trim() + "“");
     if (final.trim()) {
+      gotFinal = true;
       recognition.stop();
       submitText(final.trim());
     }
   };
   recognition.onerror = (e) => {
+    gotFinal = true; // standardmäßig kein Auto-Neustart bei Fehler
     listening = false;
     micBtn.classList.remove("active");
     stopMicAnalyser();
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-      addMessage("system", "Mikrofon-Zugriff verweigert. Du kannst stattdessen tippen.");
+      addMessage("system", t("micDenied"));
+      handsFree = false;
+      localStorage.setItem(LS_HANDSFREE, "0");
+      updateHandsFreeBtn();
+    } else if ((e.error === "no-speech" || e.error === "aborted") && handsFree && getKey()) {
+      gotFinal = false; // im Freisprech-Modus weiter zuhören
     }
-    setState("idle");
+    if (state === "listening") setState("idle");
   };
   recognition.onend = () => {
     listening = false;
     micBtn.classList.remove("active");
     stopMicAnalyser();
-    if (state === "listening") setState("idle");
+    if (!gotFinal && state === "listening") setState("idle");
+    if (handsFree && !gotFinal && getKey()) {
+      setTimeout(() => {
+        if (handsFree && state === "idle" && !listening && getKey()) startListening();
+      }, 600);
+    }
   };
 
   micBtn.addEventListener("click", () => {
     if (listening) { recognition.stop(); return; }
-    if (state === "speaking" && "speechSynthesis" in window) speechSynthesis.cancel();
-    try { recognition.start(); } catch (_) { /* bereits gestartet */ }
+    startListening();
   });
 } else {
-  // Kein Spracherkennungs-Support -> Button deaktivieren
   micBtn.disabled = true;
-  micBtn.title = "Spracherkennung in diesem Browser nicht verfügbar – bitte tippen";
+  micBtn.title = t("micUnsupported");
 }
+
+handsFreeBtn.addEventListener("click", () => {
+  if (!recognition) { addMessage("system", t("micUnsupported")); return; }
+  handsFree = !handsFree;
+  localStorage.setItem(LS_HANDSFREE, handsFree ? "1" : "0");
+  updateHandsFreeBtn();
+  if (handsFree) { if (getKey() && state === "idle") startListening(); }
+  else { if (listening) recognition.stop(); }
+});
 
 /* ---------- Mikrofon-Amplitude für die Reaktor-Pulsierung ---------- */
 let audioCtx = null, analyser = null, micStream = null, micRAF = null;
@@ -873,8 +1087,7 @@ async function startMicAnalyser() {
       analyser.getByteTimeDomainData(buf);
       let sum = 0;
       for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
-      const rms = Math.sqrt(sum / buf.length);
-      micLevel = Math.min(1, rms * 3.5);
+      micLevel = Math.min(1, Math.sqrt(sum / buf.length) * 3.5);
       micRAF = requestAnimationFrame(tick);
     };
     tick();
@@ -882,10 +1095,40 @@ async function startMicAnalyser() {
 }
 function stopMicAnalyser() {
   micLevel = 0;
-  if (micRAF) cancelAnimationFrame(micRAF), micRAF = null;
+  if (micRAF) { cancelAnimationFrame(micRAF); micRAF = null; }
   analyser = null;
-  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micStream) { micStream.getTracks().forEach(tr => tr.stop()); micStream = null; }
 }
+
+/* ================================================================
+   Sprache umschalten
+   ================================================================ */
+function applyLanguage() {
+  document.documentElement.lang = t("htmlLang");
+  $("brandSub").textContent = t("subtitle");
+  $("goalHeading").textContent = t("goalHeading");
+  $("dialogHeading").textContent = t("dialogHeading");
+  textInput.placeholder = t("placeholder");
+  sendBtn.textContent = t("send");
+  micBtn.title = recognition ? t("micTitle") : t("micUnsupported");
+  langBtn.textContent = lang.toUpperCase();
+  $("setTitle").textContent = t("settingsTitle");
+  $("setIntro").textContent = t("settingsIntro");
+  $("keyLabel").textContent = t("keyLabel");
+  $("setNote").textContent = t("securityNote");
+  $("clearKeyBtn").textContent = t("clearKey");
+  $("saveKeyBtn").textContent = t("saveKey");
+  if (recognition) recognition.lang = lang === "de" ? "de-DE" : "en-US";
+  updateHandsFreeBtn();
+  pickVoice();
+  setState(state);
+  renderGoals();
+}
+langBtn.addEventListener("click", () => {
+  lang = lang === "de" ? "en" : "de";
+  localStorage.setItem(LS_LANG, lang);
+  applyLanguage();
+});
 
 /* ================================================================
    Einstellungen
@@ -901,7 +1144,7 @@ $("settingsBtn").addEventListener("click", openSettings);
 $("saveKeyBtn").addEventListener("click", () => {
   saveKey(keyInput.value);
   closeSettings();
-  if (getKey()) addMessage("system", "API-Key gespeichert. JARVIS ist einsatzbereit.");
+  if (getKey()) addMessage("system", t("keySaved"));
 });
 $("clearKeyBtn").addEventListener("click", () => {
   localStorage.removeItem(LS_KEY);
@@ -916,15 +1159,15 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSetti
 function init() {
   sizeCanvas();
   requestAnimationFrame(drawReactor);
-  loadGoal();
+  applyLanguage();
+  loadGoals();
   setState("idle");
 
   if (!getKey()) {
-    addMessage("system", "Willkommen. Ich bin JARVIS. Bitte trage zuerst deinen Anthropic API-Key in den Einstellungen ein (Zahnrad oben rechts), dann können wir sprechen.");
+    addMessage("system", t("welcomeNoKey"));
   } else {
-    addMessage("jarvis", "Systeme online. Ich bin bereit, Sir. Nenn mir dein Ziel oder stell mir eine Frage.");
+    addMessage("jarvis", t("welcome"));
   }
-  // Canvas-Groesse nach Layout final setzen
   setTimeout(sizeCanvas, 60);
 }
 init();
