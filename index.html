@@ -194,6 +194,9 @@
     color: #dff4fb;
   }
   .msg.system .body { color: var(--warn); font-size: 13px; opacity: 0.9; }
+  .msg.jarvis.speakable .body { cursor: pointer; }
+  .msg.jarvis.speakable .body::before { content: "🔊 "; opacity: 0.75; font-size: 12px; }
+  .msg.jarvis.speakable .body:active { box-shadow: 0 0 12px var(--glow); }
 
   .goals { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
   .goal-empty { color: var(--cyan-dim); font-size: 13px; font-style: italic; }
@@ -519,7 +522,9 @@ const I18N = {
     errGeneric: (s) => "Fehler bei der Anfrage (" + s + ").",
     errDetails: " Details: ",
     errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")",
-    blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders."
+    blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders.",
+    tapToSpeak: "Antippen, um vorzulesen",
+    ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen."
   },
   en: {
     htmlLang: "en",
@@ -558,7 +563,9 @@ const I18N = {
     errGeneric: (s) => "Request failed (" + s + ").",
     errDetails: " Details: ",
     errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")",
-    blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request."
+    blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request.",
+    tapToSpeak: "Tap to read aloud",
+    ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud."
   }
 };
 
@@ -713,9 +720,22 @@ function addMessage(who, text) {
   div.innerHTML = '<span class="who"></span><span class="body"></span>';
   div.querySelector(".who").textContent = label;
   div.querySelector(".body").textContent = text;
+  if (who === "jarvis" && "speechSynthesis" in window) {
+    div.classList.add("speakable");
+    div.title = t("tapToSpeak");
+    div.addEventListener("click", () => speak(text)); // direkte Geste -> spricht auch auf iOS
+  }
   transcriptEl.appendChild(div);
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
   return div;
+}
+
+let ttsHintShown = localStorage.getItem("jarvis_ttshint") === "1";
+function maybeShowTtsHint() {
+  if (ttsHintShown || !("speechSynthesis" in window)) return;
+  ttsHintShown = true;
+  localStorage.setItem("jarvis_ttshint", "1");
+  addMessage("system", t("ttsHint"));
 }
 
 /* ================================================================
@@ -1004,6 +1024,7 @@ async function askAI(userText) {
       addMessage("jarvis", reply);
       maybeUpdateGoal(userText, reply);
       speak(reply);
+      maybeShowTtsHint();
       return;
     }
     // Alle Modelle nicht erreichbar (404 oder 5xx)
