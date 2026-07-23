@@ -195,7 +195,6 @@
   }
   .msg.system .body { color: var(--warn); font-size: 13px; opacity: 0.9; }
 
-  /* Goals */
   .goals { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
   .goal-empty { color: var(--cyan-dim); font-size: 13px; font-style: italic; }
   .goal-card {
@@ -334,6 +333,7 @@
   }
   .dialog h2 { margin: 0 0 6px; color: var(--cyan); letter-spacing: 0.2em; font-size: 16px; }
   .dialog p { font-size: 13px; line-height: 1.55; color: #a9d3df; }
+  .dialog a { color: var(--cyan); }
   .dialog label { display: block; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan-dim); margin: 16px 0 6px; }
   .dialog input {
     width: 100%;
@@ -423,10 +423,10 @@
   <div class="overlay" id="overlay">
     <div class="dialog">
       <h2 id="setTitle">EINSTELLUNGEN</h2>
-      <p id="setIntro">JARVIS nutzt die Anthropic Claude API für echte Antworten. Trage dazu deinen persönlichen API-Key ein. Der Key wird nur lokal in deinem Browser gespeichert und mit keinem Server außer Anthropic geteilt.</p>
-      <label id="keyLabel" for="keyInput">Anthropic API-Key</label>
-      <input id="keyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
-      <div class="note" id="setNote">Sicherheitshinweis: Dieses Interface ist für den persönlichen, lokalen Gebrauch gedacht. Der Key liegt im Browser (localStorage). Teile diese Datei nicht mit eingetragenem Key und stelle sie nicht öffentlich online.</div>
+      <p id="setIntro"></p>
+      <label id="keyLabel" for="keyInput">Google Gemini API-Schlüssel (kostenlos)</label>
+      <input id="keyInput" type="password" placeholder="AIza…" autocomplete="off">
+      <div class="note" id="setNote"></div>
       <div class="row">
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
@@ -438,15 +438,21 @@
 "use strict";
 
 /* ================================================================
-   Konfiguration & Übersetzungen
+   Konfiguration – kostenlose KI über Google Gemini
    ================================================================ */
-const MODEL = "claude-opus-4-8";
-const API_URL = "https://api.anthropic.com/v1/messages";
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+// Bevorzugt schnelle, kostenlos großzügige Flash-Modelle; das erste
+// funktionierende wird gemerkt. Selbstheilend bei Namensänderungen.
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash", "gemini-pro"];
+
 const LS_KEY = "jarvis_api_key";
+const LS_MODEL = "jarvis_model";
 const LS_GOALS = "jarvis_goals";
 const LS_GOAL_OLD = "jarvis_goal";
 const LS_LANG = "jarvis_lang";
 const LS_HANDSFREE = "jarvis_handsfree";
+
+let resolvedModel = localStorage.getItem(LS_MODEL) || null;
 
 const SYSTEM_PROMPTS = {
   de: [
@@ -496,22 +502,24 @@ const I18N = {
     handsFreeOn: "Freisprechen aktiv – zum Beenden klicken",
     handsFreeOff: "Freisprechen (Hände-frei-Modus)",
     settingsTitle: "EINSTELLUNGEN",
-    settingsIntro: "JARVIS nutzt die Anthropic Claude API für echte Antworten. Trage dazu deinen persönlichen API-Key ein. Der Key wird nur lokal in deinem Browser gespeichert und mit keinem Server außer Anthropic geteilt.",
-    keyLabel: "Anthropic API-Key",
-    securityNote: "Sicherheitshinweis: Dieses Interface ist für den persönlichen, lokalen Gebrauch gedacht. Der Key liegt im Browser (localStorage). Teile diese Datei nicht mit eingetragenem Key und stelle sie nicht öffentlich online.",
-    clearKey: "Key löschen",
+    settingsIntro: "JARVIS nutzt die kostenlose Google-Gemini-API. Hol dir einen kostenlosen Schlüssel unter aistudio.google.com/apikey (kein Kreditkarte nötig) und trage ihn hier ein. Er wird nur lokal in deinem Browser gespeichert.",
+    keyLabel: "Google Gemini API-Schlüssel (kostenlos)",
+    keyPlaceholder: "AIza…",
+    securityNote: "Hinweis: Der Schlüssel liegt in deinem Browser (localStorage). Teile diese Datei oder Seite nicht mit eingetragenem Schlüssel. Tipp: In der Google-Konsole kannst du den Schlüssel auf deine eigene Website (HTTP-Referrer) beschränken.",
+    clearKey: "Schlüssel löschen",
     saveKey: "Speichern",
-    keySaved: "API-Key gespeichert. JARVIS ist einsatzbereit.",
-    noKey: "Kein API-Key hinterlegt. Öffne die Einstellungen (Zahnrad oben rechts) und trage deinen Anthropic API-Key ein.",
-    welcomeNoKey: "Willkommen. Ich bin JARVIS. Bitte trage zuerst deinen Anthropic API-Key in den Einstellungen ein (Zahnrad oben rechts), dann können wir sprechen.",
+    keySaved: "Schlüssel gespeichert. JARVIS ist einsatzbereit.",
+    noKey: "Kein Schlüssel hinterlegt. Öffne die Einstellungen (Zahnrad oben rechts) und trage deinen kostenlosen Google-Gemini-Schlüssel ein.",
+    welcomeNoKey: "Willkommen. Ich bin JARVIS. Bitte trage zuerst deinen kostenlosen Google-Gemini-Schlüssel in den Einstellungen ein (Zahnrad oben rechts), dann können wir sprechen.",
     welcome: "Systeme online. Ich bin bereit, Sir. Nenn mir dein Ziel oder stell mir eine Frage.",
     micDenied: "Mikrofon-Zugriff verweigert. Du kannst stattdessen tippen.",
-    err401: "API-Key ungültig oder fehlt die Berechtigung. Bitte in den Einstellungen prüfen.",
-    err429: "Zu viele Anfragen oder Kontingent erschöpft. Bitte kurz warten und erneut versuchen.",
-    err500: "Der Anthropic-Dienst ist momentan überlastet. Bitte später erneut versuchen.",
+    errKey: "Schlüssel ungültig oder die Gemini-API ist dafür nicht freigeschaltet. Bitte in den Einstellungen prüfen.",
+    err429: "Kostenloses Kontingent vorerst erschöpft oder zu viele Anfragen. Bitte einen Moment warten und erneut versuchen.",
+    err500: "Der Dienst ist momentan überlastet. Bitte später erneut versuchen.",
     errGeneric: (s) => "Fehler bei der Anfrage (" + s + ").",
     errDetails: " Details: ",
-    errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")"
+    errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")",
+    blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders."
   },
   en: {
     htmlLang: "en",
@@ -533,22 +541,24 @@ const I18N = {
     handsFreeOn: "Hands-free active – click to stop",
     handsFreeOff: "Hands-free mode",
     settingsTitle: "SETTINGS",
-    settingsIntro: "JARVIS uses the Anthropic Claude API for real answers. Enter your personal API key below. The key is stored only locally in your browser and shared with no server other than Anthropic.",
-    keyLabel: "Anthropic API key",
-    securityNote: "Security note: This interface is meant for personal, local use. The key lives in your browser (localStorage). Do not share this file with the key entered, and do not host it publicly.",
+    settingsIntro: "JARVIS uses the free Google Gemini API. Get a free key at aistudio.google.com/apikey (no credit card required) and enter it below. It is stored only locally in your browser.",
+    keyLabel: "Google Gemini API key (free)",
+    keyPlaceholder: "AIza…",
+    securityNote: "Note: The key lives in your browser (localStorage). Do not share this file or page with the key entered. Tip: In the Google console you can restrict the key to your own website (HTTP referrer).",
     clearKey: "Clear key",
     saveKey: "Save",
-    keySaved: "API key saved. JARVIS is ready.",
-    noKey: "No API key set. Open the settings (gear, top right) and enter your Anthropic API key.",
-    welcomeNoKey: "Welcome. I am JARVIS. Please enter your Anthropic API key in the settings first (gear, top right), then we can talk.",
+    keySaved: "Key saved. JARVIS is ready.",
+    noKey: "No key set. Open the settings (gear, top right) and enter your free Google Gemini key.",
+    welcomeNoKey: "Welcome. I am JARVIS. Please enter your free Google Gemini key in the settings first (gear, top right), then we can talk.",
     welcome: "Systems online. I am ready, Sir. Tell me your goal or ask me a question.",
     micDenied: "Microphone access denied. You can type instead.",
-    err401: "API key invalid or missing permission. Please check the settings.",
-    err429: "Too many requests or quota exhausted. Please wait a moment and try again.",
-    err500: "The Anthropic service is currently overloaded. Please try again later.",
+    errKey: "Key invalid or the Gemini API is not enabled for it. Please check the settings.",
+    err429: "Free quota exhausted for now, or too many requests. Please wait a moment and try again.",
+    err500: "The service is currently overloaded. Please try again later.",
     errGeneric: (s) => "Request failed (" + s + ").",
     errDetails: " Details: ",
-    errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")"
+    errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")",
+    blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request."
   }
 };
 
@@ -559,7 +569,7 @@ let lang = localStorage.getItem(LS_LANG) || "de";
 if (!I18N[lang]) lang = "de";
 let state = "idle"; // idle | listening | thinking | speaking
 let micLevel = 0;
-const conversation = [];
+const conversation = []; // Gemini-Format: { role: "user"|"model", parts: [{text}] }
 const t = (key) => I18N[lang][key];
 
 /* ================================================================
@@ -578,7 +588,7 @@ const langBtn = $("langBtn");
 const handsFreeBtn = $("handsFreeBtn");
 
 /* ================================================================
-   API-Key
+   API-Schlüssel
    ================================================================ */
 const getKey = () => localStorage.getItem(LS_KEY) || "";
 function saveKey(v) { localStorage.setItem(LS_KEY, v.trim()); }
@@ -743,7 +753,7 @@ function speak(text) {
 /* ================================================================
    Ziele (mehrere, mit Checkliste)
    ================================================================ */
-let goals = [];          // [{ id, title, steps: [{text, done}] }]
+let goals = [];
 let activeGoalId = null;
 
 function saveGoals() { localStorage.setItem(LS_GOALS, JSON.stringify({ goals, activeGoalId })); }
@@ -756,7 +766,7 @@ function loadGoals() {
       goals = Array.isArray(parsed.goals) ? parsed.goals : [];
       activeGoalId = parsed.activeGoalId || (goals[0] && goals[0].id) || null;
     } else {
-      const old = localStorage.getItem(LS_GOAL_OLD); // Migration Einzel-Ziel
+      const old = localStorage.getItem(LS_GOAL_OLD);
       if (old) {
         const g = JSON.parse(old);
         if (g && g.title) {
@@ -868,7 +878,7 @@ function maybeUpdateGoal(userText, reply) {
     if (active) {
       const a = normTitle(active.title), b = normTitle(title);
       if (a && b && (a.includes(b) || b.includes(a))) {
-        if (steps.length) active.steps = steps; // gleiches Ziel verfeinert
+        if (steps.length) active.steps = steps;
         saveGoals(); renderGoals();
         return;
       }
@@ -886,9 +896,23 @@ function maybeUpdateGoal(userText, reply) {
 }
 
 /* ================================================================
-   Claude-API
+   KI-Anfrage (Google Gemini, kostenlos)
    ================================================================ */
-async function askClaude(userText) {
+function showApiError(status, detail) {
+  const L = I18N[lang];
+  let msg;
+  if (status === 400 || status === 401 || status === 403) msg = L.errKey;
+  else if (status === 429) msg = L.err429;
+  else if (status >= 500) msg = L.err500;
+  else msg = L.errGeneric(status);
+  if (detail) msg += L.errDetails + detail;
+  addMessage("system", msg);
+  statusEl.className = "status error";
+  statusEl.textContent = L.errorLabel;
+  setTimeout(() => setState("idle"), 200);
+}
+
+async function askAI(userText) {
   const key = getKey();
   const L = I18N[lang];
   if (!key) {
@@ -898,55 +922,67 @@ async function askClaude(userText) {
     return;
   }
 
-  conversation.push({ role: "user", content: userText });
+  conversation.push({ role: "user", parts: [{ text: userText }] });
   setState("thinking");
 
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        system: SYSTEM_PROMPTS[lang],
-        messages: conversation
-      })
-    });
+  const body = {
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPTS[lang] }] },
+    contents: conversation,
+    generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
+  };
 
-    if (!res.ok) {
-      let detail = "";
-      try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
-      let msg;
-      if (res.status === 401) msg = L.err401;
-      else if (res.status === 429) msg = L.err429;
-      else if (res.status >= 500) msg = L.err500;
-      else msg = L.errGeneric(res.status);
-      if (detail) msg += L.errDetails + detail;
-      conversation.pop();
-      addMessage("system", msg);
-      statusEl.className = "status error";
-      statusEl.textContent = L.errorLabel;
-      setTimeout(() => setState("idle"), 200);
+  const candidates = resolvedModel
+    ? [resolvedModel].concat(MODEL_CANDIDATES.filter(m => m !== resolvedModel))
+    : MODEL_CANDIDATES.slice();
+
+  try {
+    for (const model of candidates) {
+      const url = GEMINI_BASE + "/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (res.status === 404) { continue; } // Modell nicht verfügbar -> nächstes probieren
+
+      if (!res.ok) {
+        let detail = "";
+        try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
+        conversation.pop();
+        showApiError(res.status, detail);
+        return;
+      }
+
+      const data = await res.json();
+      resolvedModel = model;
+      localStorage.setItem(LS_MODEL, model);
+
+      const cand = (data.candidates && data.candidates[0]) || null;
+      let reply = "";
+      if (cand && cand.content && cand.content.parts) {
+        reply = cand.content.parts.map(p => p.text || "").join("").trim();
+      }
+      if (!reply) {
+        const blocked = (data.promptFeedback && data.promptFeedback.blockReason) ||
+                        (cand && cand.finishReason && cand.finishReason !== "STOP");
+        conversation.pop();
+        addMessage("system", blocked ? L.blocked : L.errGeneric(200));
+        statusEl.className = "status error";
+        statusEl.textContent = L.errorLabel;
+        setTimeout(() => setState("idle"), 200);
+        return;
+      }
+
+      conversation.push({ role: "model", parts: [{ text: reply }] });
+      addMessage("jarvis", reply);
+      maybeUpdateGoal(userText, reply);
+      speak(reply);
       return;
     }
-
-    const data = await res.json();
-    const reply = (data.content || [])
-      .filter(b => b.type === "text")
-      .map(b => b.text)
-      .join("\n")
-      .trim() || "…";
-
-    conversation.push({ role: "assistant", content: reply });
-    addMessage("jarvis", reply);
-    maybeUpdateGoal(userText, reply);
-    speak(reply);
-
+    // Kein Modell gefunden
+    conversation.pop();
+    showApiError(404, "");
   } catch (err) {
     conversation.pop();
     addMessage("system", L.errNet(err && err.message ? err.message : err));
@@ -964,7 +1000,7 @@ function submitText(text) {
   if (!s) return;
   addMessage("user", s);
   textInput.value = "";
-  askClaude(s);
+  askAI(s);
 }
 sendBtn.addEventListener("click", () => submitText(textInput.value));
 textInput.addEventListener("keydown", (e) => {
@@ -1026,7 +1062,7 @@ if (SpeechRecognition) {
     }
   };
   recognition.onerror = (e) => {
-    gotFinal = true; // standardmäßig kein Auto-Neustart bei Fehler
+    gotFinal = true;
     listening = false;
     micBtn.classList.remove("active");
     stopMicAnalyser();
@@ -1036,7 +1072,7 @@ if (SpeechRecognition) {
       localStorage.setItem(LS_HANDSFREE, "0");
       updateHandsFreeBtn();
     } else if ((e.error === "no-speech" || e.error === "aborted") && handsFree && getKey()) {
-      gotFinal = false; // im Freisprech-Modus weiter zuhören
+      gotFinal = false;
     }
     if (state === "listening") setState("idle");
   };
@@ -1115,6 +1151,7 @@ function applyLanguage() {
   $("setTitle").textContent = t("settingsTitle");
   $("setIntro").textContent = t("settingsIntro");
   $("keyLabel").textContent = t("keyLabel");
+  keyInput.placeholder = t("keyPlaceholder");
   $("setNote").textContent = t("securityNote");
   $("clearKeyBtn").textContent = t("clearKey");
   $("saveKeyBtn").textContent = t("saveKey");
