@@ -349,6 +349,17 @@
     outline: none;
   }
   .dialog input:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(91,232,255,0.25); }
+  .dialog select {
+    width: 100%;
+    background: rgba(3, 12, 18, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 11px 12px;
+    font-size: 14px;
+    outline: none;
+  }
+  .dialog select:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(91,232,255,0.25); }
   .dialog .note {
     margin-top: 14px; font-size: 12px; color: var(--warn);
     background: rgba(255,180,84,0.08); border: 1px solid rgba(255,180,84,0.25);
@@ -430,6 +441,8 @@
       <label id="keyLabel" for="keyInput">Google Gemini API-Schlüssel (kostenlos)</label>
       <input id="keyInput" type="password" placeholder="AIza…" autocomplete="off">
       <div class="note" id="setNote"></div>
+      <label id="voiceLabel" for="voiceSelect">Stimme</label>
+      <select id="voiceSelect"></select>
       <div class="row">
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
@@ -456,6 +469,13 @@ const LS_LANG = "jarvis_lang";
 const LS_HANDSFREE = "jarvis_handsfree";
 
 let resolvedModel = localStorage.getItem(LS_MODEL) || null;
+
+// Bevorzugte Stimmen für den JARVIS-Klang (ruhig, maennlich, moeglichst britisch).
+const VOICE_PREFS = {
+  en: ["Daniel", "Arthur", "Oliver", "Google UK English Male", "George", "Ryan", "Male"],
+  de: ["Markus", "Yannick", "Conrad", "Google Deutsch", "Male", "Männlich"]
+};
+let selectedVoiceName = localStorage.getItem("jarvis_voice") || "";
 
 const SYSTEM_PROMPTS = {
   de: [
@@ -524,7 +544,8 @@ const I18N = {
     errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")",
     blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders.",
     tapToSpeak: "Antippen, um vorzulesen",
-    ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen."
+    ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen.",
+    voiceLabel: "Stimme (für den JARVIS-Klang: Englisch + „Daniel“)"
   },
   en: {
     htmlLang: "en",
@@ -565,7 +586,8 @@ const I18N = {
     errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")",
     blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request.",
     tapToSpeak: "Tap to read aloud",
-    ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud."
+    ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud.",
+    voiceLabel: "Voice (for the JARVIS sound: English + \"Daniel\")"
   }
 };
 
@@ -745,15 +767,45 @@ let ttsVoice = null;
 function pickVoice() {
   if (!("speechSynthesis" in window)) return;
   const voices = speechSynthesis.getVoices();
-  const pref = lang === "de" ? "de" : "en";
-  ttsVoice =
-    voices.find(v => new RegExp("^" + pref + "[-_]", "i").test(v.lang || "")) ||
-    voices.find(v => (v.lang || "").toLowerCase().startsWith(pref)) ||
-    null;
+  if (!voices.length) return;
+  // 1) ausdruecklich gewaehlte Stimme
+  if (selectedVoiceName) {
+    const chosen = voices.find(v => v.name === selectedVoiceName);
+    if (chosen) { ttsVoice = chosen; return; }
+  }
+  // 2) automatische Bevorzugung (maennlich, fuer Englisch moeglichst britisch)
+  const base = lang === "de" ? "de" : "en";
+  const inLang = voices.filter(v => (v.lang || "").toLowerCase().startsWith(base));
+  const ordered = base === "en"
+    ? inLang.slice().sort((a, b) => (/(gb|uk)/i.test(b.lang) ? 1 : 0) - (/(gb|uk)/i.test(a.lang) ? 1 : 0))
+    : inLang;
+  const prefs = VOICE_PREFS[base] || [];
+  for (const name of prefs) {
+    const m = ordered.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
+    if (m) { ttsVoice = m; return; }
+  }
+  ttsVoice = ordered[0] || null;
+}
+function populateVoiceSelect() {
+  const sel = document.getElementById("voiceSelect");
+  if (!sel || !("speechSynthesis" in window)) return;
+  const voices = speechSynthesis.getVoices();
+  sel.innerHTML = "";
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = lang === "de" ? "Automatisch (empfohlen)" : "Automatic (recommended)";
+  sel.appendChild(auto);
+  voices.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v.name;
+    o.textContent = v.name + " (" + v.lang + ")";
+    if (v.name === selectedVoiceName) o.selected = true;
+    sel.appendChild(o);
+  });
 }
 if ("speechSynthesis" in window) {
   pickVoice();
-  speechSynthesis.onvoiceschanged = pickVoice;
+  speechSynthesis.onvoiceschanged = () => { pickVoice(); populateVoiceSelect(); };
 }
 
 let speechPrimed = false;
@@ -765,7 +817,6 @@ function primeSpeech() {
   speechPrimed = true;
   try {
     const warm = new SpeechSynthesisUtterance(" ");
-    warm.volume = 0;
     warm.lang = lang === "de" ? "de-DE" : "en-US";
     speechSynthesis.speak(warm);
   } catch (_) {}
@@ -781,8 +832,8 @@ function speak(text) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang === "de" ? "de-DE" : "en-US";
   if (ttsVoice) u.voice = ttsVoice;
-  u.rate = 1.0;
-  u.pitch = 1.0;
+  u.rate = 0.98;   // ruhig, gemessen
+  u.pitch = 0.85;  // etwas tiefer fuer den JARVIS-Klang
   u.onstart = () => setState("speaking");
   u.onend = () => { setState("idle"); handsFreeContinue(); };
   u.onerror = () => { setState("idle"); handsFreeContinue(); };
@@ -1202,6 +1253,8 @@ function applyLanguage() {
   $("setNote").textContent = t("securityNote");
   $("clearKeyBtn").textContent = t("clearKey");
   $("saveKeyBtn").textContent = t("saveKey");
+  $("voiceLabel").textContent = t("voiceLabel");
+  populateVoiceSelect();
   if (recognition) recognition.lang = lang === "de" ? "de-DE" : "en-US";
   updateHandsFreeBtn();
   pickVoice();
@@ -1219,6 +1272,7 @@ langBtn.addEventListener("click", () => {
    ================================================================ */
 function openSettings() {
   keyInput.value = getKey();
+  populateVoiceSelect();
   overlay.classList.add("open");
   keyInput.focus();
 }
@@ -1233,6 +1287,13 @@ $("saveKeyBtn").addEventListener("click", () => {
 $("clearKeyBtn").addEventListener("click", () => {
   localStorage.removeItem(LS_KEY);
   keyInput.value = "";
+});
+$("voiceSelect").addEventListener("change", (e) => {
+  selectedVoiceName = e.target.value;
+  localStorage.setItem("jarvis_voice", selectedVoiceName);
+  pickVoice();
+  // kurze Hoerprobe – laeuft innerhalb der Klick-Geste, spielt daher auch auf iOS
+  speak(lang === "de" ? "Systeme bereit, Sir." : "Systems ready, Sir.");
 });
 overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSettings(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSettings(); });
