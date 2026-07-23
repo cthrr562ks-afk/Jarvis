@@ -832,7 +832,7 @@ function speak(text) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang === "de" ? "de-DE" : "en-US";
   if (ttsVoice) u.voice = ttsVoice;
-  u.rate = 0.98;   // ruhig, gemessen
+  u.rate = 1.9;    // etwa doppeltes Tempo
   u.pitch = 0.85;  // etwas tiefer fuer den JARVIS-Klang
   u.onstart = () => setState("speaking");
   u.onend = () => { setState("idle"); handsFreeContinue(); };
