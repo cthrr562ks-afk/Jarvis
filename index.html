@@ -836,11 +836,14 @@ function speak(text) {
   if (!("speechSynthesis" in window)) { setState("idle"); handsFreeContinue(); return; }
   try { speechSynthesis.resume(); } catch (_) {}
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang === "de" ? "de-DE" : "en-US";
+  // Text fuer fluessige Ausgabe glaetten: Zeilenumbrueche werden zu Saetzen,
+  // damit es nicht abgehackt klingt.
+  const spoken = text.replace(/\n+/g, ". ").replace(/\.\s*\.\s*/g, ". ").replace(/\s{2,}/g, " ").trim();
+  const u = new SpeechSynthesisUtterance(spoken);
   if (ttsVoice) u.voice = ttsVoice;
+  u.lang = (ttsVoice && ttsVoice.lang) || (lang === "de" ? "de-DE" : "en-US");
   u.rate = speechRate;  // per Regler in den Einstellungen einstellbar
-  u.pitch = 0.85;       // etwas tiefer fuer den JARVIS-Klang
+  u.pitch = 1.0;        // natuerliche Tonhoehe -> klingt sauberer, weniger abgehackt
   u.onstart = () => setState("speaking");
   u.onend = () => { setState("idle"); handsFreeContinue(); };
   u.onerror = () => { setState("idle"); handsFreeContinue(); };
