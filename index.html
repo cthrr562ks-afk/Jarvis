@@ -736,8 +736,27 @@ if ("speechSynthesis" in window) {
   speechSynthesis.onvoiceschanged = pickVoice;
 }
 
+let speechPrimed = false;
+function primeSpeech() {
+  // iOS/Safari geben Sprachausgabe nur frei, wenn speak() einmal aus einer
+  // echten Nutzer-Geste heraus aufgerufen wurde. Diese stille Aufwaermung
+  // beim ersten Antippen schaltet die spaeteren (asynchronen) Antworten frei.
+  if (speechPrimed || !("speechSynthesis" in window)) return;
+  speechPrimed = true;
+  try {
+    const warm = new SpeechSynthesisUtterance(" ");
+    warm.volume = 0;
+    warm.lang = lang === "de" ? "de-DE" : "en-US";
+    speechSynthesis.speak(warm);
+  } catch (_) {}
+}
+["pointerdown", "touchend", "click", "keydown"].forEach(ev =>
+  document.addEventListener(ev, primeSpeech, { passive: true })
+);
+
 function speak(text) {
   if (!("speechSynthesis" in window)) { setState("idle"); handsFreeContinue(); return; }
+  try { speechSynthesis.resume(); } catch (_) {}
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang === "de" ? "de-DE" : "en-US";
