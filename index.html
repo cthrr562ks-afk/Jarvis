@@ -583,6 +583,7 @@ const I18N = {
     errDetails: " Details: ",
     errNet: (m) => "Verbindung fehlgeschlagen. Prüfe deine Internetverbindung. (" + m + ")",
     blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders.",
+    emptyReply: "Ich konnte gerade keine Antwort erzeugen. Bitte versuch es gleich nochmal oder formuliere es etwas anders.",
     tapToSpeak: "Antippen, um vorzulesen",
     ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen.",
     voiceLabel: "Stimme (natürliche KI-Stimme empfohlen)",
@@ -634,6 +635,7 @@ const I18N = {
     errDetails: " Details: ",
     errNet: (m) => "Connection failed. Check your internet connection. (" + m + ")",
     blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request.",
+    emptyReply: "I couldn't produce an answer just now. Please try again in a moment or rephrase.",
     tapToSpeak: "Tap to read aloud",
     ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud.",
     voiceLabel: "Voice (natural AI voice recommended)",
@@ -1223,6 +1225,14 @@ function buildSystemPrompt() {
   return s;
 }
 
+function extractReply(data) {
+  const cand = data && data.candidates && data.candidates[0];
+  if (cand && cand.content && cand.content.parts) {
+    return cand.content.parts.map(p => p.text || "").join("").trim();
+  }
+  return "";
+}
+
 function showApiError(status, detail) {
   const L = I18N[lang];
   let msg;
@@ -1253,7 +1263,7 @@ async function askAI(userText) {
   const baseBody = {
     systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
     contents: conversation,
-    generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
   };
   const headers = { "content-type": "application/json", "x-goog-api-key": key };
 
@@ -1267,22 +1277,22 @@ async function askAI(userText) {
       const url = GEMINI_BASE + "/models/" + model + ":generateContent";
       // Mit Google-Suche (aktuelle Infos). Wird sie nicht unterstuetzt/limitiert
       // (400/429), einmal ohne Suche erneut versuchen.
+      let usedTools = true;
       let res = await fetch(url, {
         method: "POST", headers,
         body: JSON.stringify(Object.assign({}, baseBody, { tools: [{ google_search: {} }] }))
       });
       if (res.status === 400 || res.status === 429) {
+        usedTools = false;
         res = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
       }
 
-      // Modell nicht verfügbar (404), Kontingent erschöpft (429) oder Server-Problem (5xx)
-      // -> naechstes Modell probieren; ein anderes Modell hat oft ein eigenes Freikontingent
+      // 404 / 429 / 5xx -> naechstes Modell (hat oft eigenes Freikontingent)
       if (res.status === 404 || res.status === 429 || res.status >= 500) {
         try { const e = await res.json(); lastDetail = (e.error && e.error.message) || ""; } catch (_) {}
         lastStatus = res.status;
         continue;
       }
-
       if (!res.ok) {
         let detail = "";
         try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
@@ -1291,20 +1301,25 @@ async function askAI(userText) {
         return;
       }
 
-      const data = await res.json();
+      let data = await res.json();
+      let reply = extractReply(data);
+
+      // Leere Antwort trotz Suche (z. B. RECITATION-Sperre) -> ohne Suche erneut versuchen
+      if (!reply && usedTools) {
+        const res2 = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
+        if (res2.ok) { data = await res2.json(); reply = extractReply(data); }
+      }
+
       resolvedModel = model;
       localStorage.setItem(LS_MODEL, model);
 
-      const cand = (data.candidates && data.candidates[0]) || null;
-      let reply = "";
-      if (cand && cand.content && cand.content.parts) {
-        reply = cand.content.parts.map(p => p.text || "").join("").trim();
-      }
       if (!reply) {
-        const blocked = (data.promptFeedback && data.promptFeedback.blockReason) ||
-                        (cand && cand.finishReason && cand.finishReason !== "STOP");
+        const cand = data.candidates && data.candidates[0];
+        const fr = cand && cand.finishReason;
+        const hardBlock = (data.promptFeedback && data.promptFeedback.blockReason) ||
+                          fr === "SAFETY" || fr === "RECITATION" || fr === "PROHIBITED_CONTENT";
         conversation.pop();
-        addMessage("system", blocked ? L.blocked : L.errGeneric(200));
+        addMessage("system", hardBlock ? L.blocked : L.emptyReply);
         statusEl.className = "status error";
         statusEl.textContent = L.errorLabel;
         setTimeout(() => setState("idle"), 200);
