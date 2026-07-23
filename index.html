@@ -361,6 +361,22 @@
   }
   .dialog select:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(91,232,255,0.25); }
   .dialog input[type="range"] { padding: 0; border: none; background: transparent; accent-color: var(--cyan); height: 28px; }
+  .dialog textarea {
+    width: 100%;
+    background: rgba(3, 12, 18, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 11px 12px;
+    font-size: 14px;
+    outline: none;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .dialog textarea:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(91,232,255,0.25); }
+  .panel .notes-heading { margin-top: 14px; }
+  #notesList { overflow-y: auto; }
+  #notesList li .txt { flex: 1 1 auto; }
   .dialog .note {
     margin-top: 14px; font-size: 12px; color: var(--warn);
     background: rgba(255,180,84,0.08); border: 1px solid rgba(255,180,84,0.25);
@@ -401,6 +417,7 @@
     <header class="topbar">
       <div class="brand">J.A.R.V.I.S. <small id="brandSub">Just A Rather Very Intelligent System</small></div>
       <div class="topbar-actions">
+        <button class="iconbtn" id="briefBtn" title="Update / Briefing">☀</button>
         <button class="iconbtn text" id="langBtn" title="Sprache wechseln / Switch language">DE</button>
         <button class="iconbtn" id="handsFreeBtn" title="Freisprechen">∞</button>
         <button class="iconbtn" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen">⚙</button>
@@ -411,6 +428,8 @@
       <section class="panel" id="goalPanel">
         <h2 id="goalHeading">Aktuelle Ziele</h2>
         <div class="goals" id="goals"></div>
+        <h2 id="notesHeading" class="notes-heading">Notizen</h2>
+        <ul class="steps" id="notesList"></ul>
       </section>
 
       <section class="center">
@@ -446,6 +465,8 @@
       <select id="voiceSelect"></select>
       <label id="rateLabel" for="rateRange">Sprechtempo</label>
       <input type="range" id="rateRange" min="0.7" max="2" step="0.05">
+      <label id="profileLabel" for="profileInput">Über dich (für JARVIS)</label>
+      <textarea id="profileInput" rows="3"></textarea>
       <div class="row">
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
@@ -470,6 +491,8 @@ const LS_GOALS = "jarvis_goals";
 const LS_GOAL_OLD = "jarvis_goal";
 const LS_LANG = "jarvis_lang";
 const LS_HANDSFREE = "jarvis_handsfree";
+const LS_PROFILE = "jarvis_profile";
+const LS_NOTES = "jarvis_notes";
 
 let resolvedModel = localStorage.getItem(LS_MODEL) || null;
 
@@ -563,7 +586,15 @@ const I18N = {
     tapToSpeak: "Antippen, um vorzulesen",
     ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen.",
     voiceLabel: "Stimme (natürliche KI-Stimme empfohlen)",
-    rateLabel: "Sprechtempo"
+    rateLabel: "Sprechtempo",
+    notesHeading: "Notizen",
+    notesEmpty: "Noch keine Notizen. Sag „merk dir …“.",
+    deleteNote: "Notiz löschen",
+    noteSaved: "Notiert.",
+    profileLabel: "Über dich (für JARVIS)",
+    profilePlaceholder: "z. B. Ich bin Trader (Krypto & Aktien). Halte mich zu Märkten und seriösen Online-Chancen auf dem Laufenden.",
+    briefTitle: "Update / Briefing",
+    briefPrompt: "Gib mir mein Update: ein kompakter, tagesaktueller Überblick zu den Themen, die mich interessieren (siehe mein Profil, unter anderem Trading). Nenne wichtige Nachrichten von heute und – falls seriös – realistische Chancen. Weisen ehrlich auf Risiken hin, keine Garantien."
   },
   en: {
     htmlLang: "en",
@@ -606,7 +637,15 @@ const I18N = {
     tapToSpeak: "Tap to read aloud",
     ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud.",
     voiceLabel: "Voice (natural AI voice recommended)",
-    rateLabel: "Speech rate"
+    rateLabel: "Speech rate",
+    notesHeading: "Notes",
+    notesEmpty: "No notes yet. Say \"remember …\".",
+    deleteNote: "Delete note",
+    noteSaved: "Noted.",
+    profileLabel: "About you (for JARVIS)",
+    profilePlaceholder: "e.g. I'm a trader (crypto & stocks). Keep me updated on markets and legitimate online opportunities.",
+    briefTitle: "Update / briefing",
+    briefPrompt: "Give me my update: a compact, up-to-date overview of the topics I care about (see my profile, including trading). Mention important news from today and — if legitimate — realistic opportunities. Point out risks honestly, no guarantees."
   }
 };
 
@@ -1122,6 +1161,68 @@ function maybeUpdateGoal(userText, reply) {
 /* ================================================================
    KI-Anfrage (Google Gemini, kostenlos)
    ================================================================ */
+/* ================================================================
+   Profil & Notizen (Gedaechtnis)
+   ================================================================ */
+const getProfile = () => localStorage.getItem(LS_PROFILE) || "";
+let notes = [];
+function loadNotes() { try { notes = JSON.parse(localStorage.getItem(LS_NOTES) || "[]") || []; } catch (_) { notes = []; } }
+function saveNotes() { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); }
+function renderNotes() {
+  const el = document.getElementById("notesList");
+  if (!el) return;
+  el.innerHTML = "";
+  if (!notes.length) {
+    const li = document.createElement("li");
+    li.style.borderBottom = "none";
+    li.style.cursor = "default";
+    const s = document.createElement("span");
+    s.className = "goal-empty";
+    s.textContent = t("notesEmpty");
+    li.appendChild(s);
+    el.appendChild(li);
+    return;
+  }
+  notes.forEach(n => {
+    const li = document.createElement("li");
+    li.style.cursor = "default";
+    const txt = document.createElement("span");
+    txt.className = "txt";
+    txt.textContent = n.text;
+    const del = document.createElement("button");
+    del.className = "goal-del";
+    del.textContent = "×";
+    del.title = t("deleteNote");
+    del.addEventListener("click", () => { notes = notes.filter(x => x.id !== n.id); saveNotes(); renderNotes(); });
+    li.appendChild(txt);
+    li.appendChild(del);
+    el.appendChild(li);
+  });
+}
+function maybeCaptureNote(text) {
+  const m = text.match(/^\s*(?:merk(?:e)? dir|notier(?:e)?|notiz:|erinnere mich an|remember|note that|note:)\s+(.*\S)/i);
+  if (m) {
+    notes.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text: m[1].trim() });
+    saveNotes();
+    renderNotes();
+  }
+}
+function buildSystemPrompt() {
+  let s = SYSTEM_PROMPTS[lang];
+  const profile = getProfile();
+  if (profile) s += (lang === "de" ? "\n\nÜber den Nutzer: " : "\n\nAbout the user: ") + profile;
+  if (notes.length) {
+    s += (lang === "de"
+      ? "\n\nGespeicherte Notizen des Nutzers (beziehe sie ein, wenn relevant):\n"
+      : "\n\nSaved notes from the user (use them when relevant):\n")
+      + notes.map((n, i) => (i + 1) + ". " + n.text).join("\n");
+  }
+  s += lang === "de"
+    ? "\n\nWenn nach aktuellen Informationen, Maerkten, Trading oder Verdienstmoeglichkeiten gefragt wird, nutze bei Bedarf die Google-Suche fuer aktuelle, belegbare Fakten. Sei ehrlich und vorsichtig: Weise auf Risiken hin, gib keine Gewaehr auf Gewinne, keine verbindliche Finanzberatung, und warne vor unrealistischen oder betruegerischen Angeboten."
+    : "\n\nWhen asked about current information, markets, trading or ways to earn money, use Google Search when helpful for current, verifiable facts. Be honest and cautious: point out risks, do not guarantee profits, give no binding financial advice, and warn about unrealistic or fraudulent offers.";
+  return s;
+}
+
 function showApiError(status, detail) {
   const L = I18N[lang];
   let msg;
@@ -1149,11 +1250,12 @@ async function askAI(userText) {
   conversation.push({ role: "user", parts: [{ text: userText }] });
   setState("thinking");
 
-  const body = {
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPTS[lang] }] },
+  const baseBody = {
+    systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
     contents: conversation,
     generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
   };
+  const headers = { "content-type": "application/json", "x-goog-api-key": key };
 
   const candidates = resolvedModel
     ? [resolvedModel].concat(MODEL_CANDIDATES.filter(m => m !== resolvedModel))
@@ -1163,11 +1265,15 @@ async function askAI(userText) {
     let lastStatus = 0, lastDetail = "";
     for (const model of candidates) {
       const url = GEMINI_BASE + "/models/" + model + ":generateContent";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body)
+      // Mit Google-Suche (aktuelle Infos). Wird sie nicht unterstuetzt/limitiert
+      // (400/429), einmal ohne Suche erneut versuchen.
+      let res = await fetch(url, {
+        method: "POST", headers,
+        body: JSON.stringify(Object.assign({}, baseBody, { tools: [{ google_search: {} }] }))
       });
+      if (res.status === 400 || res.status === 429) {
+        res = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
+      }
 
       // Modell nicht verfügbar (404), Kontingent erschöpft (429) oder Server-Problem (5xx)
       // -> naechstes Modell probieren; ein anderes Modell hat oft ein eigenes Freikontingent
@@ -1232,6 +1338,7 @@ function submitText(text) {
   if (!s) return;
   addMessage("user", s);
   textInput.value = "";
+  maybeCaptureNote(s);
   askAI(s);
 }
 sendBtn.addEventListener("click", () => submitText(textInput.value));
@@ -1388,8 +1495,13 @@ function applyLanguage() {
   $("clearKeyBtn").textContent = t("clearKey");
   $("saveKeyBtn").textContent = t("saveKey");
   $("voiceLabel").textContent = t("voiceLabel");
+  $("notesHeading").textContent = t("notesHeading");
+  $("profileLabel").textContent = t("profileLabel");
+  $("profileInput").placeholder = t("profilePlaceholder");
+  $("briefBtn").title = t("briefTitle");
   populateVoiceSelect();
   updateRateLabel();
+  renderNotes();
   if (recognition) recognition.lang = lang === "de" ? "de-DE" : "en-US";
   updateHandsFreeBtn();
   pickVoice();
@@ -1407,6 +1519,7 @@ langBtn.addEventListener("click", () => {
    ================================================================ */
 function openSettings() {
   keyInput.value = getKey();
+  $("profileInput").value = getProfile();
   populateVoiceSelect();
   rateRange.value = speechRate;
   updateRateLabel();
@@ -1418,8 +1531,13 @@ function closeSettings() { overlay.classList.remove("open"); }
 $("settingsBtn").addEventListener("click", openSettings);
 $("saveKeyBtn").addEventListener("click", () => {
   saveKey(keyInput.value);
+  localStorage.setItem(LS_PROFILE, $("profileInput").value.trim());
   closeSettings();
   if (getKey()) addMessage("system", t("keySaved"));
+});
+$("briefBtn").addEventListener("click", () => {
+  if (!getKey()) { openSettings(); return; }
+  submitText(t("briefPrompt"));
 });
 $("clearKeyBtn").addEventListener("click", () => {
   localStorage.removeItem(LS_KEY);
@@ -1456,6 +1574,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSetti
 function init() {
   sizeCanvas();
   requestAnimationFrame(drawReactor);
+  loadNotes();
   applyLanguage();
   loadGoals();
   setState("idle");
