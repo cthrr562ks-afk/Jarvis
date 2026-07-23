@@ -903,7 +903,7 @@ function showApiError(status, detail) {
   let msg;
   if (status === 400 || status === 401 || status === 403) msg = L.errKey;
   else if (status === 429) msg = L.err429;
-  else if (status >= 500) msg = L.err500;
+  else if (status >= 500) msg = L.err500 + " (HTTP " + status + ")";
   else msg = L.errGeneric(status);
   if (detail) msg += L.errDetails + detail;
   addMessage("system", msg);
@@ -936,6 +936,7 @@ async function askAI(userText) {
     : MODEL_CANDIDATES.slice();
 
   try {
+    let lastStatus = 0, lastDetail = "";
     for (const model of candidates) {
       const url = GEMINI_BASE + "/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
       const res = await fetch(url, {
@@ -944,7 +945,12 @@ async function askAI(userText) {
         body: JSON.stringify(body)
       });
 
-      if (res.status === 404) { continue; } // Modell nicht verfügbar -> nächstes probieren
+      // Modell nicht verfügbar (404) oder Server-Problem (5xx) -> nächstes Modell probieren
+      if (res.status === 404 || res.status >= 500) {
+        try { const e = await res.json(); lastDetail = (e.error && e.error.message) || ""; } catch (_) {}
+        lastStatus = res.status;
+        continue;
+      }
 
       if (!res.ok) {
         let detail = "";
@@ -980,9 +986,9 @@ async function askAI(userText) {
       speak(reply);
       return;
     }
-    // Kein Modell gefunden
+    // Alle Modelle nicht erreichbar (404 oder 5xx)
     conversation.pop();
-    showApiError(404, "");
+    showApiError(lastStatus || 404, lastDetail);
   } catch (err) {
     conversation.pop();
     addMessage("system", L.errNet(err && err.message ? err.message : err));
