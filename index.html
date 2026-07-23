@@ -443,7 +443,7 @@
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // Bevorzugt schnelle, kostenlos großzügige Flash-Modelle; das erste
 // funktionierende wird gemerkt. Selbstheilend bei Namensänderungen.
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash", "gemini-pro"];
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.0-flash-lite", "gemini-1.5-flash"];
 
 const LS_KEY = "jarvis_api_key";
 const LS_MODEL = "jarvis_model";
@@ -945,8 +945,9 @@ async function askAI(userText) {
         body: JSON.stringify(body)
       });
 
-      // Modell nicht verfügbar (404) oder Server-Problem (5xx) -> nächstes Modell probieren
-      if (res.status === 404 || res.status >= 500) {
+      // Modell nicht verfügbar (404), Kontingent erschöpft (429) oder Server-Problem (5xx)
+      // -> naechstes Modell probieren; ein anderes Modell hat oft ein eigenes Freikontingent
+      if (res.status === 404 || res.status === 429 || res.status >= 500) {
         try { const e = await res.json(); lastDetail = (e.error && e.error.message) || ""; } catch (_) {}
         lastStatus = res.status;
         continue;
