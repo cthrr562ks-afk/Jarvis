@@ -482,6 +482,18 @@ let selectedVoiceName = localStorage.getItem("jarvis_voice") || "";
 let speechRate = parseFloat(localStorage.getItem("jarvis_rate"));
 if (!speechRate || isNaN(speechRate)) speechRate = 1.3;
 
+// Neuronale (natuerlich klingende) Gemini-Stimmen: [Name, Beschreibung de, Beschreibung en]
+const NEURAL_VOICES = [
+  ["Charon", "tief, sachlich", "deep, informative"],
+  ["Iapetus", "klar", "clear"],
+  ["Orus", "fest", "firm"],
+  ["Algieba", "weich", "smooth"],
+  ["Gacrux", "reif", "mature"],
+  ["Sadaltager", "kompetent", "knowledgeable"],
+  ["Kore", "fest (weiblich)", "firm (female)"]
+];
+const TTS_MODELS = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"];
+
 const SYSTEM_PROMPTS = {
   de: [
     "Du bist JARVIS, ein hochentwickelter persoenlicher KI-Assistent im Stil von Iron Man.",
@@ -550,7 +562,7 @@ const I18N = {
     blocked: "Diese Antwort wurde vom Anbieter aus Sicherheitsgründen blockiert. Formuliere die Anfrage bitte anders.",
     tapToSpeak: "Antippen, um vorzulesen",
     ttsHint: "Falls du JARVIS nicht hörst: Am iPhone den Stumm-Schalter ausschalten (kleiner orangener Schalter links oben) und die Lautstärke aufdrehen. Tipp: Du kannst jede Antwort von JARVIS auch antippen, um sie vorlesen zu lassen.",
-    voiceLabel: "Stimme (für den JARVIS-Klang: Englisch + „Daniel“)",
+    voiceLabel: "Stimme (natürliche KI-Stimme empfohlen)",
     rateLabel: "Sprechtempo"
   },
   en: {
@@ -593,7 +605,7 @@ const I18N = {
     blocked: "This answer was blocked by the provider for safety reasons. Please rephrase your request.",
     tapToSpeak: "Tap to read aloud",
     ttsHint: "If you can't hear JARVIS: turn off the mute switch on your iPhone (small orange switch, top left) and turn up the volume. Tip: you can also tap any of JARVIS' answers to have it read aloud.",
-    voiceLabel: "Voice (for the JARVIS sound: English + \"Daniel\")",
+    voiceLabel: "Voice (natural AI voice recommended)",
     rateLabel: "Speech rate"
   }
 };
@@ -795,20 +807,40 @@ function pickVoice() {
 }
 function populateVoiceSelect() {
   const sel = document.getElementById("voiceSelect");
-  if (!sel || !("speechSynthesis" in window)) return;
-  const voices = speechSynthesis.getVoices();
+  if (!sel) return;
   sel.innerHTML = "";
   const auto = document.createElement("option");
   auto.value = "";
-  auto.textContent = lang === "de" ? "Automatisch (empfohlen)" : "Automatic (recommended)";
+  auto.textContent = lang === "de" ? "Automatisch – natürliche KI-Stimme" : "Automatic – natural AI voice";
+  if (selectedVoiceName === "") auto.selected = true;
   sel.appendChild(auto);
-  voices.forEach(v => {
+
+  const gAI = document.createElement("optgroup");
+  gAI.label = lang === "de" ? "KI-Stimmen (natürlich)" : "AI voices (natural)";
+  NEURAL_VOICES.forEach(v => {
     const o = document.createElement("option");
-    o.value = v.name;
-    o.textContent = v.name + " (" + v.lang + ")";
-    if (v.name === selectedVoiceName) o.selected = true;
-    sel.appendChild(o);
+    o.value = "gemini:" + v[0];
+    o.textContent = v[0] + " – " + (lang === "de" ? v[1] : v[2]);
+    if (selectedVoiceName === "gemini:" + v[0]) o.selected = true;
+    gAI.appendChild(o);
   });
+  sel.appendChild(gAI);
+
+  if ("speechSynthesis" in window) {
+    const voices = speechSynthesis.getVoices();
+    if (voices.length) {
+      const gDev = document.createElement("optgroup");
+      gDev.label = lang === "de" ? "Geräte-Stimmen" : "Device voices";
+      voices.forEach(v => {
+        const o = document.createElement("option");
+        o.value = v.name;
+        o.textContent = v.name + " (" + v.lang + ")";
+        if (v.name === selectedVoiceName) o.selected = true;
+        gDev.appendChild(o);
+      });
+      sel.appendChild(gDev);
+    }
+  }
 }
 if ("speechSynthesis" in window) {
   pickVoice();
@@ -816,38 +848,130 @@ if ("speechSynthesis" in window) {
 }
 
 let speechPrimed = false;
+let playCtx = null;        // AudioContext fuer die neuronale Stimme
+let currentSource = null;  // laufende Audio-Wiedergabe
+
 function primeSpeech() {
-  // iOS/Safari geben Sprachausgabe nur frei, wenn speak() einmal aus einer
-  // echten Nutzer-Geste heraus aufgerufen wurde. Diese stille Aufwaermung
-  // beim ersten Antippen schaltet die spaeteren (asynchronen) Antworten frei.
-  if (speechPrimed || !("speechSynthesis" in window)) return;
+  // iOS/Safari geben Audio nur frei, wenn es einmal aus einer echten
+  // Nutzer-Geste heraus gestartet wurde. Beim ersten Antippen entsperren
+  // wir sowohl die Browser-Stimme als auch den Audio-Kontext der KI-Stimme.
+  if (speechPrimed) return;
   speechPrimed = true;
+  if ("speechSynthesis" in window) {
+    try {
+      const warm = new SpeechSynthesisUtterance(" ");
+      warm.lang = lang === "de" ? "de-DE" : "en-US";
+      speechSynthesis.speak(warm);
+    } catch (_) {}
+  }
   try {
-    const warm = new SpeechSynthesisUtterance(" ");
-    warm.lang = lang === "de" ? "de-DE" : "en-US";
-    speechSynthesis.speak(warm);
+    playCtx = playCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (playCtx.state === "suspended") playCtx.resume();
+    const b = playCtx.createBuffer(1, 1, 22050);
+    const s = playCtx.createBufferSource();
+    s.buffer = b; s.connect(playCtx.destination); s.start(0);
   } catch (_) {}
 }
 ["pointerdown", "touchend", "click", "keydown"].forEach(ev =>
   document.addEventListener(ev, primeSpeech, { passive: true })
 );
 
-function speak(text) {
+function stopSpeaking() {
+  if (currentSource) { try { currentSource.onended = null; currentSource.stop(); } catch (_) {} currentSource = null; }
+  if ("speechSynthesis" in window) { try { speechSynthesis.cancel(); } catch (_) {} }
+}
+
+function smoothForSpeech(text) {
+  return text.replace(/\n+/g, ". ").replace(/\.\s*\.\s*/g, ". ").replace(/\s{2,}/g, " ").trim();
+}
+
+// Entscheidet: natuerliche KI-Stimme (Gemini) oder Geraete-Stimme?
+function resolveTts() {
+  if (selectedVoiceName.indexOf("gemini:") === 0) return { neural: true, voiceName: selectedVoiceName.slice(7) };
+  if (selectedVoiceName === "") return { neural: !!getKey(), voiceName: "Charon" };
+  return { neural: false, voiceName: selectedVoiceName };
+}
+
+// Rohes PCM (16-Bit) aus der Gemini-TTS als Audio abspielen.
+function playPcm(base64, sampleRate) {
+  if (!playCtx) return false;
+  try {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const pcm = new Int16Array(bytes.buffer);
+    const buf = playCtx.createBuffer(1, pcm.length, sampleRate || 24000);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+    const src = playCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(playCtx.destination);
+    src.onended = () => { currentSource = null; setState("idle"); handsFreeContinue(); };
+    currentSource = src;
+    setState("speaking");
+    src.start();
+    return true;
+  } catch (_) { return false; }
+}
+
+async function speakNeural(text, voiceName) {
+  const key = getKey();
+  if (!key || !playCtx) return false;
+  const body = {
+    contents: [{ parts: [{ text: text }] }],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } }
+    }
+  };
+  try {
+    for (const model of TTS_MODELS) {
+      const res = await fetch(GEMINI_BASE + "/models/" + model + ":generateContent", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(body)
+      });
+      if (res.status === 404 || res.status === 429 || res.status >= 500) continue;
+      if (!res.ok) return false;
+      const data = await res.json();
+      const cand = data.candidates && data.candidates[0];
+      const part = cand && cand.content && cand.content.parts && cand.content.parts[0];
+      const inline = part && part.inlineData;
+      if (!inline || !inline.data) return false;
+      const rate = parseInt((String(inline.mimeType || "").match(/rate=(\d+)/) || [])[1] || "24000", 10);
+      return playPcm(inline.data, rate);
+    }
+    return false;
+  } catch (_) { return false; }
+}
+
+function browserSpeak(text, voiceName) {
   if (!("speechSynthesis" in window)) { setState("idle"); handsFreeContinue(); return; }
   try { speechSynthesis.resume(); } catch (_) {}
   speechSynthesis.cancel();
-  // Text fuer fluessige Ausgabe glaetten: Zeilenumbrueche werden zu Saetzen,
-  // damit es nicht abgehackt klingt.
-  const spoken = text.replace(/\n+/g, ". ").replace(/\.\s*\.\s*/g, ". ").replace(/\s{2,}/g, " ").trim();
-  const u = new SpeechSynthesisUtterance(spoken);
-  if (ttsVoice) u.voice = ttsVoice;
-  u.lang = (ttsVoice && ttsVoice.lang) || (lang === "de" ? "de-DE" : "en-US");
-  u.rate = speechRate;  // per Regler in den Einstellungen einstellbar
-  u.pitch = 1.0;        // natuerliche Tonhoehe -> klingt sauberer, weniger abgehackt
+  const u = new SpeechSynthesisUtterance(smoothForSpeech(text));
+  const voices = speechSynthesis.getVoices();
+  const v = voiceName ? voices.find(x => x.name === voiceName) : ttsVoice;
+  if (v) u.voice = v;
+  u.lang = (v && v.lang) || (lang === "de" ? "de-DE" : "en-US");
+  u.rate = speechRate;
+  u.pitch = 1.0;
   u.onstart = () => setState("speaking");
   u.onend = () => { setState("idle"); handsFreeContinue(); };
   u.onerror = () => { setState("idle"); handsFreeContinue(); };
   speechSynthesis.speak(u);
+}
+
+async function speak(text) {
+  stopSpeaking();
+  const cfg = resolveTts();
+  if (cfg.neural) {
+    setState("speaking");
+    const ok = await speakNeural(smoothForSpeech(text), cfg.voiceName);
+    if (ok) return;               // natuerliche Stimme spielt
+    // sonst: Rueckfall auf die Geraete-Stimme
+  }
+  browserSpeak(text, cfg.neural ? null : cfg.voiceName);
 }
 
 /* ================================================================
