@@ -1271,19 +1271,20 @@ async function askAI(userText) {
     ? [resolvedModel].concat(MODEL_CANDIDATES.filter(m => m !== resolvedModel))
     : MODEL_CANDIDATES.slice();
 
+  // Primaeranfrage: mit Google-Suche und ausgeschaltetem internen "Denken"
+  // (2.5-Modelle geben sonst manchmal leeren Text zurueck).
+  const richBody = Object.assign({}, baseBody, {
+    tools: [{ google_search: {} }],
+    generationConfig: Object.assign({}, baseBody.generationConfig, { thinkingConfig: { thinkingBudget: 0 } })
+  });
+
   try {
-    let lastStatus = 0, lastDetail = "";
+    let lastStatus = 0, lastDetail = "", sawEmpty = false, sawBlock = false;
     for (const model of candidates) {
       const url = GEMINI_BASE + "/models/" + model + ":generateContent";
-      // Mit Google-Suche (aktuelle Infos). Wird sie nicht unterstuetzt/limitiert
-      // (400/429), einmal ohne Suche erneut versuchen.
-      let usedTools = true;
-      let res = await fetch(url, {
-        method: "POST", headers,
-        body: JSON.stringify(Object.assign({}, baseBody, { tools: [{ google_search: {} }] }))
-      });
+      let res = await fetch(url, { method: "POST", headers, body: JSON.stringify(richBody) });
+      // Abgelehnt/limitiert -> schlicht, ohne Suche/Extras
       if (res.status === 400 || res.status === 429) {
-        usedTools = false;
         res = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
       }
 
@@ -1303,29 +1304,23 @@ async function askAI(userText) {
 
       let data = await res.json();
       let reply = extractReply(data);
-
-      // Leere Antwort trotz Suche (z. B. RECITATION-Sperre) -> ohne Suche erneut versuchen
-      if (!reply && usedTools) {
+      // leere Antwort -> einmal schlicht (ohne Suche/Extras) nachfassen
+      if (!reply) {
         const res2 = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
         if (res2.ok) { data = await res2.json(); reply = extractReply(data); }
       }
 
-      resolvedModel = model;
-      localStorage.setItem(LS_MODEL, model);
-
       if (!reply) {
         const cand = data.candidates && data.candidates[0];
         const fr = cand && cand.finishReason;
-        const hardBlock = (data.promptFeedback && data.promptFeedback.blockReason) ||
-                          fr === "SAFETY" || fr === "RECITATION" || fr === "PROHIBITED_CONTENT";
-        conversation.pop();
-        addMessage("system", hardBlock ? L.blocked : L.emptyReply);
-        statusEl.className = "status error";
-        statusEl.textContent = L.errorLabel;
-        setTimeout(() => setState("idle"), 200);
-        return;
+        if ((data.promptFeedback && data.promptFeedback.blockReason) ||
+            fr === "SAFETY" || fr === "RECITATION" || fr === "PROHIBITED_CONTENT") sawBlock = true;
+        sawEmpty = true;
+        continue; // dieses Modell liefert nichts -> naechstes probieren
       }
 
+      resolvedModel = model;
+      localStorage.setItem(LS_MODEL, model);
       conversation.push({ role: "model", parts: [{ text: reply }] });
       addMessage("jarvis", reply);
       maybeUpdateGoal(userText, reply);
@@ -1333,9 +1328,16 @@ async function askAI(userText) {
       maybeShowTtsHint();
       return;
     }
-    // Alle Modelle nicht erreichbar (404 oder 5xx)
+    // Nichts hat funktioniert
     conversation.pop();
-    showApiError(lastStatus || 404, lastDetail);
+    if (sawEmpty) {
+      addMessage("system", sawBlock ? L.blocked : L.emptyReply);
+      statusEl.className = "status error";
+      statusEl.textContent = L.errorLabel;
+      setTimeout(() => setState("idle"), 200);
+    } else {
+      showApiError(lastStatus || 404, lastDetail);
+    }
   } catch (err) {
     conversation.pop();
     addMessage("system", L.errNet(err && err.message ? err.message : err));
