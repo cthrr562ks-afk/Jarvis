@@ -22,6 +22,40 @@
     --ok: #6dffb0;
   }
 
+  /* "Command Center"-Design (Rot/Amber) */
+  body[data-theme="amber"] {
+    --cyan: #ff9a4d;
+    --cyan-dim: #9c6a3e;
+    --cyan-deep: #e2571b;
+    --glow: rgba(255, 150, 60, 0.5);
+    --line: rgba(255, 150, 60, 0.17);
+    --panel: rgba(32, 15, 7, 0.55);
+  }
+  body[data-theme="amber"] .backdrop {
+    background:
+      radial-gradient(circle at 50% 42%, rgba(120, 42, 12, 0.55) 0%, rgba(14, 6, 3, 0.92) 55%, #0a0402 100%),
+      linear-gradient(0deg, #0a0402, #100704);
+  }
+
+  /* HUD-Eckklammern */
+  .corners { position: fixed; inset: 10px; z-index: 2; pointer-events: none; }
+  .corners span { position: absolute; width: 24px; height: 24px; border: 2px solid var(--line); }
+  .corners span:nth-child(1) { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .corners span:nth-child(2) { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .corners span:nth-child(3) { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .corners span:nth-child(4) { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  /* Live-Uhr */
+  .clock { text-align: center; margin-bottom: 4px; line-height: 1.1; }
+  .clock .time {
+    font-size: clamp(28px, 6vw, 46px); font-weight: 300; letter-spacing: 0.1em;
+    color: var(--cyan); text-shadow: 0 0 18px var(--glow); font-variant-numeric: tabular-nums;
+  }
+  .clock .date { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--cyan-dim); margin-top: 3px; }
+
+  /* Wellenform */
+  #wave { width: min(46vh, 90%); max-width: 100%; height: 38px; display: block; opacity: 0.9; }
+
   * { box-sizing: border-box; }
 
   html, body {
@@ -415,12 +449,14 @@
 <body>
   <div class="backdrop"></div>
   <div class="grid"></div>
+  <div class="corners"><span></span><span></span><span></span><span></span></div>
 
   <div class="app">
     <header class="topbar">
       <div class="brand">J.A.R.V.I.S. <small id="brandSub">Just A Rather Very Intelligent System</small></div>
       <div class="topbar-actions">
         <button class="iconbtn" id="briefBtn" title="Update / Briefing">☀</button>
+        <button class="iconbtn" id="themeBtn" title="Design wechseln / Switch design">◑</button>
         <button class="iconbtn text" id="langBtn" title="Sprache wechseln / Switch language">DE</button>
         <button class="iconbtn" id="handsFreeBtn" title="Freisprechen">∞</button>
         <button class="iconbtn" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen">⚙</button>
@@ -436,10 +472,15 @@
       </section>
 
       <section class="center">
+        <div class="clock">
+          <span class="time" id="clockTime">--:--:--</span>
+          <div class="date" id="clockDate"></div>
+        </div>
         <div class="reactor-wrap">
           <canvas id="reactor"></canvas>
         </div>
         <div class="status" id="status">Systeme bereit</div>
+        <canvas id="wave"></canvas>
       </section>
 
       <section class="panel">
@@ -474,7 +515,7 @@
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
       </div>
-      <div style="text-align:center; font-size:11px; color:var(--cyan-dim); margin-top:14px; letter-spacing:0.1em;">JARVIS · Build 13</div>
+      <div style="text-align:center; font-size:11px; color:var(--cyan-dim); margin-top:14px; letter-spacing:0.1em;">JARVIS · Build 14</div>
     </div>
   </div>
 
@@ -497,6 +538,7 @@ const LS_LANG = "jarvis_lang";
 const LS_HANDSFREE = "jarvis_handsfree";
 const LS_PROFILE = "jarvis_profile";
 const LS_NOTES = "jarvis_notes";
+const LS_THEME = "jarvis_theme";
 
 let resolvedModel = localStorage.getItem(LS_MODEL) || null;
 
@@ -660,6 +702,11 @@ const I18N = {
    ================================================================ */
 let lang = localStorage.getItem(LS_LANG) || "de";
 if (!I18N[lang]) lang = "de";
+let theme = localStorage.getItem(LS_THEME) || "cyan"; // "cyan" | "amber"
+if (theme !== "amber") theme = "cyan";
+// Akzentfarbe (RGB) je Design – fuer Reaktor und Wellenform.
+const THEME_RGB = { cyan: "91, 232, 255", amber: "255, 154, 77" };
+const themeRGB = () => THEME_RGB[theme] || THEME_RGB.cyan;
 let state = "idle"; // idle | listening | thinking | speaking
 let micLevel = 0;
 const conversation = []; // Gemini-Format: { role: "user"|"model", parts: [{text}] }
@@ -719,7 +766,7 @@ function drawReactor(ts) {
   angle += spin * 0.016;
   const pulse = 1 + Math.sin(time * pulseSpeed) * pulseAmp;
 
-  const CY = "91, 232, 255";
+  const CY = themeRGB();
   const WA = "255, 180, 84";
   const col = hue === "warn" ? WA : CY;
 
@@ -784,6 +831,78 @@ function polygon(cx, cy, r, sides, rot, style, lw) {
   ctx.lineWidth = lw;
   ctx.strokeStyle = style;
   ctx.stroke();
+}
+
+/* ================================================================
+   Live-Uhr
+   ================================================================ */
+const clockTimeEl = $("clockTime");
+const clockDateEl = $("clockDate");
+function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+function updateClock() {
+  const now = new Date();
+  if (clockTimeEl) clockTimeEl.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());
+  if (clockDateEl) {
+    try {
+      clockDateEl.textContent = now.toLocaleDateString(lang === "de" ? "de-DE" : "en-US",
+        { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    } catch (_) {
+      clockDateEl.textContent = now.toDateString();
+    }
+  }
+}
+
+/* ================================================================
+   Wellenform (reagiert auf Zustand und Stimme)
+   ================================================================ */
+const waveCanvas = $("wave");
+const wctx = waveCanvas ? waveCanvas.getContext("2d") : null;
+function sizeWave() {
+  if (!waveCanvas) return;
+  const rect = waveCanvas.getBoundingClientRect();
+  waveCanvas.width = Math.round(rect.width * dpr);
+  waveCanvas.height = Math.round(rect.height * dpr);
+}
+window.addEventListener("resize", sizeWave);
+let wavePhase = 0;
+function drawWave() {
+  if (!wctx) return;
+  const w = waveCanvas.width, h = waveCanvas.height;
+  if (!w || !h) { requestAnimationFrame(drawWave); return; }
+  wctx.clearRect(0, 0, w, h);
+  const mid = h / 2;
+  let amp = h * 0.10, speed = 0.02;
+  if (state === "listening") { amp = h * (0.14 + micLevel * 0.42); speed = 0.05; }
+  else if (state === "thinking") { amp = h * 0.22; speed = 0.09; }
+  else if (state === "speaking") { amp = h * 0.34; speed = 0.07; }
+  wavePhase += speed;
+  const rgb = themeRGB();
+  wctx.lineWidth = 2 * dpr;
+  wctx.strokeStyle = "rgba(" + rgb + ",0.85)";
+  wctx.shadowBlur = 8 * dpr;
+  wctx.shadowColor = "rgba(" + rgb + ",0.6)";
+  wctx.beginPath();
+  const stepX = 2 * dpr;
+  for (let x = 0; x <= w; x += stepX) {
+    const t01 = x / w;
+    const env = Math.sin(t01 * Math.PI); // an den Raendern auslaufen lassen
+    const y = mid
+      + Math.sin(t01 * 22 + wavePhase) * amp * env
+      + Math.sin(t01 * 41 - wavePhase * 1.7) * amp * 0.35 * env;
+    if (x === 0) wctx.moveTo(x, y); else wctx.lineTo(x, y);
+  }
+  wctx.stroke();
+  wctx.shadowBlur = 0;
+  requestAnimationFrame(drawWave);
+}
+
+/* ================================================================
+   Design (Cyan / Amber "Command Center")
+   ================================================================ */
+function applyTheme() {
+  document.body.setAttribute("data-theme", theme);
+  const btn = $("themeBtn");
+  if (btn) btn.classList.toggle("on", theme === "amber");
 }
 
 /* ================================================================
@@ -1535,6 +1654,13 @@ langBtn.addEventListener("click", () => {
   lang = lang === "de" ? "en" : "de";
   localStorage.setItem(LS_LANG, lang);
   applyLanguage();
+  updateClock();
+});
+
+$("themeBtn").addEventListener("click", () => {
+  theme = theme === "amber" ? "cyan" : "amber";
+  localStorage.setItem(LS_THEME, theme);
+  applyTheme();
 });
 
 /* ================================================================
@@ -1596,7 +1722,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSetti
    ================================================================ */
 function init() {
   sizeCanvas();
+  sizeWave();
   requestAnimationFrame(drawReactor);
+  requestAnimationFrame(drawWave);
+  applyTheme();
+  updateClock();
+  setInterval(updateClock, 1000);
   loadNotes();
   applyLanguage();
   loadGoals();
@@ -1607,7 +1738,7 @@ function init() {
   } else {
     addMessage("jarvis", t("welcome"));
   }
-  setTimeout(sizeCanvas, 60);
+  setTimeout(() => { sizeCanvas(); sizeWave(); }, 60);
 }
 init();
 </script>
