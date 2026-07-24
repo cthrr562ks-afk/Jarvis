@@ -56,6 +56,21 @@
   /* Wellenform */
   #wave { width: min(46vh, 90%); max-width: 100%; height: 38px; display: block; opacity: 0.9; }
 
+  /* Beobachtungs-Chips (Watchlist) */
+  .watch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 6px 4px 10px; border: 1px solid var(--line); border-radius: 20px;
+    background: rgba(5, 18, 26, 0.5); font-size: 12.5px; color: #dff4fb;
+  }
+  .chip-x { background: none; border: none; color: var(--cyan-dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+  .chip-x:hover { color: #ff6b6b; }
+
+  /* Options-Zeile (Checkbox) in den Einstellungen */
+  .optrow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .optrow input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cyan); flex: 0 0 auto; }
+  .optrow label { margin: 0; text-transform: none; letter-spacing: 0.02em; font-size: 13px; color: var(--text); }
+
   * { box-sizing: border-box; }
 
   html, body {
@@ -365,6 +380,8 @@
   .overlay.open { display: flex; }
   .dialog {
     width: min(520px, 92vw);
+    max-height: 92vh;
+    overflow-y: auto;
     background: linear-gradient(180deg, rgba(8,26,36,0.96), rgba(4,14,20,0.96));
     border: 1px solid var(--cyan-deep);
     border-radius: 16px;
@@ -443,6 +460,11 @@
     .reactor-wrap { width: min(40vh, 70%); }
     .panel { max-height: 34vh; }
     .brand small { display: none; }
+    .brand { font-size: 16px; letter-spacing: 0.22em; flex: 0 0 auto; }
+    .topbar { padding: 10px 12px 8px; gap: 8px; flex-wrap: wrap; }
+    .topbar-actions { flex: 1 1 100%; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .iconbtn { width: 38px; height: 38px; font-size: 15px; }
+    .clock .time { font-size: clamp(24px, 8vw, 38px); }
   }
 </style>
 </head>
@@ -456,6 +478,7 @@
       <div class="brand">J.A.R.V.I.S. <small id="brandSub">Just A Rather Very Intelligent System</small></div>
       <div class="topbar-actions">
         <button class="iconbtn" id="briefBtn" title="Update / Briefing">☀</button>
+        <button class="iconbtn" id="agentBtn" title="Geheimdienst-Modus">🛰</button>
         <button class="iconbtn" id="themeBtn" title="Design wechseln / Switch design">◑</button>
         <button class="iconbtn text" id="langBtn" title="Sprache wechseln / Switch language">DE</button>
         <button class="iconbtn" id="handsFreeBtn" title="Freisprechen">∞</button>
@@ -467,6 +490,8 @@
       <section class="panel" id="goalPanel">
         <h2 id="goalHeading">Aktuelle Ziele</h2>
         <div class="goals" id="goals"></div>
+        <h2 id="watchHeading" class="notes-heading">Beobachtung</h2>
+        <div class="watch" id="watchList"></div>
         <h2 id="notesHeading" class="notes-heading">Notizen</h2>
         <ul class="steps" id="notesList"></ul>
       </section>
@@ -511,11 +536,21 @@
       <input type="range" id="rateRange" min="0.7" max="2" step="0.05">
       <label id="profileLabel" for="profileInput">Über dich (für JARVIS)</label>
       <textarea id="profileInput" rows="3"></textarea>
+      <label id="agentIntLabel" for="agentIntSelect">Geheimdienst-Intervall</label>
+      <select id="agentIntSelect">
+        <option value="15">15 min</option>
+        <option value="30">30 min</option>
+        <option value="60">60 min</option>
+      </select>
+      <div class="optrow">
+        <input type="checkbox" id="autoBriefChk">
+        <label id="autoBriefLabel" for="autoBriefChk">Auto-Briefing beim Öffnen (1×/Tag)</label>
+      </div>
       <div class="row">
         <button class="btn" id="clearKeyBtn">Key löschen</button>
         <button class="btn primary" id="saveKeyBtn">Speichern</button>
       </div>
-      <div style="text-align:center; font-size:11px; color:var(--cyan-dim); margin-top:14px; letter-spacing:0.1em;">JARVIS · Build 14</div>
+      <div style="text-align:center; font-size:11px; color:var(--cyan-dim); margin-top:14px; letter-spacing:0.1em;">JARVIS · Build 15</div>
     </div>
   </div>
 
@@ -539,6 +574,11 @@ const LS_HANDSFREE = "jarvis_handsfree";
 const LS_PROFILE = "jarvis_profile";
 const LS_NOTES = "jarvis_notes";
 const LS_THEME = "jarvis_theme";
+const LS_WATCH = "jarvis_watch";
+const LS_AGENT = "jarvis_agent";
+const LS_AGENT_INT = "jarvis_agent_int";
+const LS_AUTOBRIEF = "jarvis_autobrief";
+const LS_LASTBRIEF = "jarvis_lastbrief";
 
 let resolvedModel = localStorage.getItem(LS_MODEL) || null;
 
@@ -641,7 +681,21 @@ const I18N = {
     profileLabel: "Über dich (für JARVIS)",
     profilePlaceholder: "z. B. Ich bin Trader (Krypto & Aktien). Halte mich zu Märkten und seriösen Online-Chancen auf dem Laufenden.",
     briefTitle: "Update / Briefing",
-    briefPrompt: "Gib mir mein Update: ein kompakter, tagesaktueller Überblick zu den Themen, die mich interessieren (siehe mein Profil, unter anderem Trading). Nenne wichtige Nachrichten von heute und – falls seriös – realistische Chancen. Weisen ehrlich auf Risiken hin, keine Garantien."
+    briefPrompt: "Gib mir mein Tagesbriefing. Nutze die Google-Suche für aktuelle Fakten von heute. Struktur, kurz und zum Vorlesen geeignet: erstens die wichtigsten Marktbewegungen (Krypto, Aktien, Indizes sowie alles aus meiner Beobachtungsliste und meinem Profil), zweitens die wichtigsten Nachrichten von heute, drittens – falls seriös – eine realistische Chance mit ehrlichem Risiko-Hinweis. Keine Aufzählungszeichen, fließende Sätze, insgesamt höchstens etwa acht Sätze. Keine Garantien.",
+    briefLabel: "Tagesbriefing",
+    watchHeading: "Beobachtung",
+    watchEmpty: "Nichts beobachtet. Sag „beobachte Bitcoin, Nvidia …“.",
+    watchAdded: "Beobachte jetzt:",
+    watchNone: "Das beobachte ich bereits.",
+    removeWatch: "Aus Beobachtung entfernen",
+    agentOn: "Geheimdienst-Modus aktiv – meldet sich automatisch",
+    agentOff: "Geheimdienst-Modus (automatische Updates)",
+    agentEnabled: "Geheimdienst-Modus aktiv, Sir. Ich melde mich alle {n} Minuten mit einem Lage-Update, solange diese Seite geöffnet bleibt.",
+    agentDisabled: "Geheimdienst-Modus deaktiviert.",
+    agentIntLabel: "Geheimdienst-Intervall",
+    autoBriefLabel: "Auto-Briefing beim Öffnen (1×/Tag)",
+    autoBriefRunning: "Guten Tag, Sir. Ihr Tagesbriefing wird vorbereitet …",
+    stopped: "Verstanden, ich bin still."
   },
   en: {
     htmlLang: "en",
@@ -693,7 +747,21 @@ const I18N = {
     profileLabel: "About you (for JARVIS)",
     profilePlaceholder: "e.g. I'm a trader (crypto & stocks). Keep me updated on markets and legitimate online opportunities.",
     briefTitle: "Update / briefing",
-    briefPrompt: "Give me my update: a compact, up-to-date overview of the topics I care about (see my profile, including trading). Mention important news from today and — if legitimate — realistic opportunities. Point out risks honestly, no guarantees."
+    briefPrompt: "Give me my daily briefing. Use Google Search for current facts from today. Structured, short and suitable for reading aloud: first the most important market moves (crypto, stocks, indices, plus everything on my watchlist and profile), second the most important news from today, third — if legitimate — one realistic opportunity with an honest risk note. No bullet points, flowing sentences, at most about eight sentences in total. No guarantees.",
+    briefLabel: "Daily briefing",
+    watchHeading: "Watchlist",
+    watchEmpty: "Nothing watched. Say \"watch Bitcoin, Nvidia …\".",
+    watchAdded: "Now watching:",
+    watchNone: "I'm already watching that.",
+    removeWatch: "Remove from watchlist",
+    agentOn: "Intelligence mode active – reports automatically",
+    agentOff: "Intelligence mode (automatic updates)",
+    agentEnabled: "Intelligence mode active, Sir. I will report a situation update every {n} minutes while this page stays open.",
+    agentDisabled: "Intelligence mode disabled.",
+    agentIntLabel: "Update interval",
+    autoBriefLabel: "Auto briefing on open (once/day)",
+    autoBriefRunning: "Good day, Sir. Preparing your daily briefing …",
+    stopped: "Understood, I'll be quiet."
   }
 };
 
@@ -711,6 +779,14 @@ let state = "idle"; // idle | listening | thinking | speaking
 let micLevel = 0;
 const conversation = []; // Gemini-Format: { role: "user"|"model", parts: [{text}] }
 const t = (key) => I18N[lang][key];
+
+// Watchlist & Geheimdienst-Modus (automatische Updates)
+let watch = [];
+let agentMode = localStorage.getItem(LS_AGENT) === "1";
+let agentInterval = parseInt(localStorage.getItem(LS_AGENT_INT) || "30", 10);
+if (!agentInterval || isNaN(agentInterval)) agentInterval = 30;
+let agentTimer = null, agentBusy = false;
+let autoBrief = localStorage.getItem(LS_AUTOBRIEF) === "1";
 
 /* ================================================================
    DOM
@@ -1342,6 +1418,11 @@ function buildSystemPrompt() {
       : "\n\nSaved notes from the user (use them when relevant):\n")
       + notes.map((n, i) => (i + 1) + ". " + n.text).join("\n");
   }
+  if (watch.length) {
+    s += (lang === "de"
+      ? "\n\nBeobachtungsliste des Nutzers (Märkte/Themen, die er verfolgt): "
+      : "\n\nUser's watchlist (markets/topics they follow): ") + watch.join(", ");
+  }
   s += lang === "de"
     ? "\n\nWenn nach aktuellen Informationen, Maerkten, Trading oder Verdienstmoeglichkeiten gefragt wird, nutze bei Bedarf die Google-Suche fuer aktuelle, belegbare Fakten. Sei ehrlich und vorsichtig: Weise auf Risiken hin, gib keine Gewaehr auf Gewinne, keine verbindliche Finanzberatung, und warne vor unrealistischen oder betruegerischen Angeboten."
     : "\n\nWhen asked about current information, markets, trading or ways to earn money, use Google Search when helpful for current, verifiable facts. Be honest and cautious: point out risks, do not guarantee profits, give no binding financial advice, and warn about unrealistic or fraudulent offers.";
@@ -1370,6 +1451,85 @@ function showApiError(status, detail) {
   setTimeout(() => setState("idle"), 200);
 }
 
+// Low-Level: eine Gemini-Anfrage mit Modell-Fallback und Google-Suche.
+// Gibt { reply, model } oder { error: {kind, status, detail} } zurueck.
+async function geminiGenerate(contents, systemText) {
+  const key = getKey();
+  const headers = { "content-type": "application/json", "x-goog-api-key": key };
+  const baseBody = {
+    systemInstruction: { parts: [{ text: systemText }] },
+    contents,
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
+  };
+  // Primaeranfrage: mit Google-Suche und ausgeschaltetem internen "Denken"
+  // (2.5-Modelle geben sonst manchmal leeren Text zurueck).
+  const richBody = Object.assign({}, baseBody, {
+    tools: [{ google_search: {} }],
+    generationConfig: Object.assign({}, baseBody.generationConfig, { thinkingConfig: { thinkingBudget: 0 } })
+  });
+
+  const candidates = (resolvedModel && MODEL_CANDIDATES.indexOf(resolvedModel) !== -1)
+    ? [resolvedModel].concat(MODEL_CANDIDATES.filter(m => m !== resolvedModel))
+    : MODEL_CANDIDATES.slice();
+
+  let lastStatus = 0, lastDetail = "", sawEmpty = false, sawBlock = false, saw429 = false;
+  for (const model of candidates) {
+    const url = GEMINI_BASE + "/models/" + model + ":generateContent";
+    let res = await fetch(url, { method: "POST", headers, body: JSON.stringify(richBody) });
+    // Abgelehnt/limitiert -> schlicht, ohne Suche/Extras
+    if (res.status === 400 || res.status === 429) {
+      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
+    }
+    // 404 / 429 / 5xx -> naechstes Modell (hat oft eigenes Freikontingent)
+    if (res.status === 404 || res.status === 429 || res.status >= 500) {
+      try { const e = await res.json(); lastDetail = (e.error && e.error.message) || ""; } catch (_) {}
+      lastStatus = res.status;
+      if (res.status === 429) saw429 = true;
+      continue;
+    }
+    if (!res.ok) {
+      let detail = "";
+      try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
+      return { error: { kind: "http", status: res.status, detail } };
+    }
+
+    let data = await res.json();
+    let reply = extractReply(data);
+    // leere Antwort -> einmal schlicht (ohne Suche/Extras) nachfassen
+    if (!reply) {
+      const res2 = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
+      if (res2.ok) { data = await res2.json(); reply = extractReply(data); }
+    }
+    if (!reply) {
+      const cand = data.candidates && data.candidates[0];
+      const fr = cand && cand.finishReason;
+      if ((data.promptFeedback && data.promptFeedback.blockReason) ||
+          fr === "SAFETY" || fr === "RECITATION" || fr === "PROHIBITED_CONTENT") sawBlock = true;
+      sawEmpty = true;
+      continue; // dieses Modell liefert nichts -> naechstes probieren
+    }
+
+    resolvedModel = model;
+    localStorage.setItem(LS_MODEL, model);
+    return { reply, model };
+  }
+  if (sawEmpty) return { error: { kind: sawBlock ? "blocked" : "empty" } };
+  return { error: { kind: "http", status: saw429 ? 429 : (lastStatus || 404), detail: saw429 ? "" : lastDetail } };
+}
+
+function handleGenError(error) {
+  const L = I18N[lang];
+  if (error.kind === "empty" || error.kind === "blocked") {
+    addMessage("system", error.kind === "blocked" ? L.blocked : L.emptyReply);
+    statusEl.className = "status error";
+    statusEl.textContent = L.errorLabel;
+    setTimeout(() => setState("idle"), 200);
+  } else {
+    showApiError(error.status, error.detail);
+  }
+}
+
+// Haupt-Dialog: mit Gespraechsverlauf, Ziel-Erkennung und Sprachausgabe.
 async function askAI(userText) {
   const key = getKey();
   const L = I18N[lang];
@@ -1379,90 +1539,16 @@ async function askAI(userText) {
     openSettings();
     return;
   }
-
   conversation.push({ role: "user", parts: [{ text: userText }] });
   setState("thinking");
-
-  const baseBody = {
-    systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
-    contents: conversation,
-    generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
-  };
-  const headers = { "content-type": "application/json", "x-goog-api-key": key };
-
-  const candidates = (resolvedModel && MODEL_CANDIDATES.indexOf(resolvedModel) !== -1)
-    ? [resolvedModel].concat(MODEL_CANDIDATES.filter(m => m !== resolvedModel))
-    : MODEL_CANDIDATES.slice();
-
-  // Primaeranfrage: mit Google-Suche und ausgeschaltetem internen "Denken"
-  // (2.5-Modelle geben sonst manchmal leeren Text zurueck).
-  const richBody = Object.assign({}, baseBody, {
-    tools: [{ google_search: {} }],
-    generationConfig: Object.assign({}, baseBody.generationConfig, { thinkingConfig: { thinkingBudget: 0 } })
-  });
-
   try {
-    let lastStatus = 0, lastDetail = "", sawEmpty = false, sawBlock = false, saw429 = false;
-    for (const model of candidates) {
-      const url = GEMINI_BASE + "/models/" + model + ":generateContent";
-      let res = await fetch(url, { method: "POST", headers, body: JSON.stringify(richBody) });
-      // Abgelehnt/limitiert -> schlicht, ohne Suche/Extras
-      if (res.status === 400 || res.status === 429) {
-        res = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
-      }
-
-      // 404 / 429 / 5xx -> naechstes Modell (hat oft eigenes Freikontingent)
-      if (res.status === 404 || res.status === 429 || res.status >= 500) {
-        try { const e = await res.json(); lastDetail = (e.error && e.error.message) || ""; } catch (_) {}
-        lastStatus = res.status;
-        if (res.status === 429) saw429 = true;
-        continue;
-      }
-      if (!res.ok) {
-        let detail = "";
-        try { const e = await res.json(); detail = e.error && e.error.message ? e.error.message : ""; } catch (_) {}
-        conversation.pop();
-        showApiError(res.status, detail);
-        return;
-      }
-
-      let data = await res.json();
-      let reply = extractReply(data);
-      // leere Antwort -> einmal schlicht (ohne Suche/Extras) nachfassen
-      if (!reply) {
-        const res2 = await fetch(url, { method: "POST", headers, body: JSON.stringify(baseBody) });
-        if (res2.ok) { data = await res2.json(); reply = extractReply(data); }
-      }
-
-      if (!reply) {
-        const cand = data.candidates && data.candidates[0];
-        const fr = cand && cand.finishReason;
-        if ((data.promptFeedback && data.promptFeedback.blockReason) ||
-            fr === "SAFETY" || fr === "RECITATION" || fr === "PROHIBITED_CONTENT") sawBlock = true;
-        sawEmpty = true;
-        continue; // dieses Modell liefert nichts -> naechstes probieren
-      }
-
-      resolvedModel = model;
-      localStorage.setItem(LS_MODEL, model);
-      conversation.push({ role: "model", parts: [{ text: reply }] });
-      addMessage("jarvis", reply);
-      maybeUpdateGoal(userText, reply);
-      speak(reply);
-      maybeShowTtsHint();
-      return;
-    }
-    // Nichts hat funktioniert
-    conversation.pop();
-    if (sawEmpty) {
-      addMessage("system", sawBlock ? L.blocked : L.emptyReply);
-      statusEl.className = "status error";
-      statusEl.textContent = L.errorLabel;
-      setTimeout(() => setState("idle"), 200);
-    } else {
-      // Ratenlimit priorisiert anzeigen (ehrliche "bitte kurz warten"-Meldung)
-      showApiError(saw429 ? 429 : (lastStatus || 404), saw429 ? "" : lastDetail);
-    }
+    const r = await geminiGenerate(conversation, buildSystemPrompt());
+    if (r.error) { conversation.pop(); handleGenError(r.error); return; }
+    conversation.push({ role: "model", parts: [{ text: r.reply }] });
+    addMessage("jarvis", r.reply);
+    maybeUpdateGoal(userText, r.reply);
+    speak(r.reply);
+    maybeShowTtsHint();
   } catch (err) {
     conversation.pop();
     addMessage("system", L.errNet(err && err.message ? err.message : err));
@@ -1470,6 +1556,169 @@ async function askAI(userText) {
     statusEl.textContent = L.errorLabel;
     setTimeout(() => setState("idle"), 200);
   }
+}
+
+// Einmal-Anfrage ohne den Hauptverlauf zu belasten (fuer automatische Updates).
+async function askQuick(promptText) {
+  const key = getKey();
+  if (!key) return;
+  setState("thinking");
+  try {
+    const contents = [{ role: "user", parts: [{ text: promptText }] }];
+    const r = await geminiGenerate(contents, buildSystemPrompt());
+    if (r.error) { handleGenError(r.error); return; }
+    addMessage("jarvis", r.reply);
+    speak(r.reply);
+    maybeShowTtsHint();
+  } catch (err) {
+    setState("idle");
+  }
+}
+
+/* ================================================================
+   Watchlist (Beobachtung)
+   ================================================================ */
+function loadWatch() { try { watch = JSON.parse(localStorage.getItem(LS_WATCH) || "[]") || []; } catch (_) { watch = []; } }
+function saveWatch() { localStorage.setItem(LS_WATCH, JSON.stringify(watch)); }
+function renderWatch() {
+  const el = $("watchList");
+  if (!el) return;
+  el.innerHTML = "";
+  if (!watch.length) {
+    const s = document.createElement("span");
+    s.className = "goal-empty";
+    s.textContent = t("watchEmpty");
+    el.appendChild(s);
+    return;
+  }
+  watch.forEach(w => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    const tx = document.createElement("span");
+    tx.textContent = w;
+    const x = document.createElement("button");
+    x.className = "chip-x";
+    x.textContent = "×";
+    x.title = t("removeWatch");
+    x.addEventListener("click", () => { watch = watch.filter(i => i !== w); saveWatch(); renderWatch(); });
+    chip.appendChild(tx);
+    chip.appendChild(x);
+    el.appendChild(chip);
+  });
+}
+function addWatch(raw) {
+  const parts = raw.split(/[,;]|\bund\b|\band\b|\bsowie\b/i).map(s => s.replace(/[.?!]+$/, "").trim()).filter(Boolean);
+  const added = [];
+  parts.forEach(p => {
+    if (p.length > 40) p = p.slice(0, 40).trim();
+    if (p && !watch.some(w => w.toLowerCase() === p.toLowerCase())) { watch.push(p); added.push(p); }
+  });
+  if (added.length) { saveWatch(); renderWatch(); }
+  return added;
+}
+
+/* ================================================================
+   Geheimdienst-Modus (automatische Lage-Updates)
+   ================================================================ */
+function agentPrompt() {
+  const list = watch.length
+    ? watch.join(", ")
+    : (getProfile()
+        ? (lang === "de" ? "meine Interessen laut Profil" : "my interests from the profile")
+        : (lang === "de" ? "die wichtigsten Finanzmärkte (Krypto, Aktien, Indizes)" : "the main financial markets (crypto, stocks, indices)"));
+  return lang === "de"
+    ? "Kurzes Lage-Update in zwei bis drei Sätzen zu: " + list + ". Nutze die Google-Suche für aktuelle Fakten. Nenne die wichtigsten aktuellen Bewegungen und relevante News von heute, konkret und mit Zahlen wenn möglich. Wenn nichts Wesentliches passiert ist, sag das in einem Satz. Keine Einleitung, direkt zur Sache, zum Vorlesen geeignet."
+    : "Short situation update in two to three sentences about: " + list + ". Use Google Search for current facts. Name the most important current moves and relevant news from today, concrete and with numbers if possible. If nothing significant happened, say so in one sentence. No intro, straight to the point, suitable for reading aloud.";
+}
+async function runAgentTick() {
+  if (!agentMode || agentBusy || !getKey()) return;
+  if (document.visibilityState !== "visible") return; // Kosten sparen, wenn im Hintergrund
+  if (state !== "idle" || listening) return;          // nicht mitten im Gespräch stören
+  agentBusy = true;
+  try { await askQuick(agentPrompt()); } finally { agentBusy = false; }
+}
+function startAgent() { stopAgent(); agentTimer = setInterval(runAgentTick, agentInterval * 60 * 1000); }
+function stopAgent() { if (agentTimer) { clearInterval(agentTimer); agentTimer = null; } }
+function updateAgentBtn() {
+  const b = $("agentBtn");
+  if (!b) return;
+  b.classList.toggle("on", agentMode);
+  b.title = agentMode ? t("agentOn") : t("agentOff");
+}
+function setAgentMode(on, announce) {
+  agentMode = !!on;
+  localStorage.setItem(LS_AGENT, agentMode ? "1" : "0");
+  updateAgentBtn();
+  if (agentMode) {
+    startAgent();
+    if (announce) {
+      addMessage("system", t("agentEnabled").replace("{n}", String(agentInterval)));
+      setTimeout(runAgentTick, 2500); // gleich ein erstes Update zeigen
+    }
+  } else {
+    stopAgent();
+    if (announce) addMessage("system", t("agentDisabled"));
+  }
+}
+
+/* ================================================================
+   Tages-Briefing
+   ================================================================ */
+function runBrief() {
+  if (!getKey()) { openSettings(); return; }
+  askAI(t("briefPrompt"));
+}
+function todayStr() { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+function maybeAutoBrief() {
+  if (!autoBrief || !getKey()) return;
+  if (localStorage.getItem(LS_LASTBRIEF) === todayStr()) return;
+  localStorage.setItem(LS_LASTBRIEF, todayStr());
+  setTimeout(() => { addMessage("system", t("autoBriefRunning")); runBrief(); }, 1400);
+}
+
+/* ================================================================
+   Sprachbefehle / lokale Aktionen
+   Gibt true zurueck, wenn der Text als Befehl behandelt wurde.
+   ================================================================ */
+function handleCommand(raw) {
+  const s = raw.trim();
+  const low = s.toLowerCase();
+
+  // Ruhe / Stopp
+  if (/^(stopp?|halt stop|sei (bitte )?ruhig|ruhe|schweig(e)?|be quiet|quiet|stop talking|stop)[.!]*$/.test(low)) {
+    stopSpeaking(); setState("idle");
+    return true;
+  }
+  // Geheimdienst-Modus an/aus
+  if (/(geheimdienst|überwachungsmodus|überwachungs-modus|agentenmodus|wachmodus|intelligence mode)/.test(low)) {
+    const off = /(aus|beend|stopp|deaktiv|off|ruhe)/.test(low);
+    setAgentMode(!off, true);
+    return true;
+  }
+  // Tagesbriefing
+  if (/^(briefing|tagesbriefing|update|lagebericht|tagesüberblick|gib mir mein update|was ist (heute )?wichtig|was war heute wichtig|brief me|daily brief(ing)?)[.!?]*$/.test(low)) {
+    runBrief();
+    return true;
+  }
+  // Watchlist erweitern: "beobachte …", "verfolge …", "watch …"
+  const m = s.match(/^(?:beobachte|behalte im auge|behalte|verfolge|überwache|watch|track)\s+(.+)/i);
+  if (m) {
+    const added = addWatch(m[1]);
+    const msg = added.length ? (t("watchAdded") + " " + added.join(", ")) : t("watchNone");
+    addMessage("system", msg);
+    speak(msg);
+    return true;
+  }
+  // Design per Sprache
+  if (/(command.?center|rot(er)? modus|amber|geheimdienst.?look)/.test(low) && !/aus/.test(low)) {
+    theme = "amber"; localStorage.setItem(LS_THEME, theme); applyTheme();
+    return true;
+  }
+  if (/(blau(er)? modus|normaler modus|standard.?design|cyan)/.test(low)) {
+    theme = "cyan"; localStorage.setItem(LS_THEME, theme); applyTheme();
+    return true;
+  }
+  return false;
 }
 
 /* ================================================================
@@ -1481,6 +1730,7 @@ function submitText(text) {
   addMessage("user", s);
   textInput.value = "";
   maybeCaptureNote(s);
+  if (handleCommand(s)) return; // lokaler Befehl -> nicht an die KI schicken
   askAI(s);
 }
 sendBtn.addEventListener("click", () => submitText(textInput.value));
@@ -1638,14 +1888,19 @@ function applyLanguage() {
   $("saveKeyBtn").textContent = t("saveKey");
   $("voiceLabel").textContent = t("voiceLabel");
   $("notesHeading").textContent = t("notesHeading");
+  $("watchHeading").textContent = t("watchHeading");
   $("profileLabel").textContent = t("profileLabel");
   $("profileInput").placeholder = t("profilePlaceholder");
+  $("agentIntLabel").textContent = t("agentIntLabel");
+  $("autoBriefLabel").textContent = t("autoBriefLabel");
   $("briefBtn").title = t("briefTitle");
   populateVoiceSelect();
   updateRateLabel();
   renderNotes();
+  renderWatch();
   if (recognition) recognition.lang = lang === "de" ? "de-DE" : "en-US";
   updateHandsFreeBtn();
+  updateAgentBtn();
   pickVoice();
   setState(state);
   renderGoals();
@@ -1669,6 +1924,8 @@ $("themeBtn").addEventListener("click", () => {
 function openSettings() {
   keyInput.value = getKey();
   $("profileInput").value = getProfile();
+  $("agentIntSelect").value = String(agentInterval);
+  $("autoBriefChk").checked = autoBrief;
   populateVoiceSelect();
   rateRange.value = speechRate;
   updateRateLabel();
@@ -1681,13 +1938,20 @@ $("settingsBtn").addEventListener("click", openSettings);
 $("saveKeyBtn").addEventListener("click", () => {
   saveKey(keyInput.value);
   localStorage.setItem(LS_PROFILE, $("profileInput").value.trim());
+  agentInterval = parseInt($("agentIntSelect").value, 10) || 30;
+  localStorage.setItem(LS_AGENT_INT, String(agentInterval));
+  autoBrief = $("autoBriefChk").checked;
+  localStorage.setItem(LS_AUTOBRIEF, autoBrief ? "1" : "0");
+  if (agentMode) startAgent(); // neues Intervall übernehmen
   closeSettings();
   if (getKey()) addMessage("system", t("keySaved"));
 });
 $("briefBtn").addEventListener("click", () => {
   if (!getKey()) { openSettings(); return; }
-  submitText(t("briefPrompt"));
+  addMessage("user", t("briefLabel"));
+  runBrief();
 });
+$("agentBtn").addEventListener("click", () => setAgentMode(!agentMode, true));
 $("clearKeyBtn").addEventListener("click", () => {
   localStorage.removeItem(LS_KEY);
   keyInput.value = "";
@@ -1729,6 +1993,7 @@ function init() {
   updateClock();
   setInterval(updateClock, 1000);
   loadNotes();
+  loadWatch();
   applyLanguage();
   loadGoals();
   setState("idle");
@@ -1738,6 +2003,8 @@ function init() {
   } else {
     addMessage("jarvis", t("welcome"));
   }
+  if (agentMode) startAgent();
+  maybeAutoBrief();
   setTimeout(() => { sizeCanvas(); sizeWave(); }, 60);
 }
 init();
